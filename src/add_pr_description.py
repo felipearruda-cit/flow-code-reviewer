@@ -10,9 +10,14 @@ def main():
     # Obter variáveis de ambiente
     github_token = os.environ.get("GITHUB_TOKEN")
     access_token = os.environ.get("TOKEN_LLM_API")
+    environment = os.environ.get("ENVIRONMENT_NAME", "ai-pr-review")
+    api_url = os.environ.get("AI_API_URL", "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions")
+    ai_model = os.environ.get("AI_MODEL", "gpt-4o-mini")
+    
+    print(f"Ambiente em uso: {environment}")
     
     if not access_token:
-        print("Erro: TOKEN_LLM_API não está definido! Configure este secret no repositório.")
+        print(f"Erro: TOKEN_LLM_API não está definido no ambiente '{environment}'! Configure este secret.")
         return
     
     try:
@@ -31,10 +36,12 @@ def main():
         diff_text = pr_info["diff_text"]
         
         print("\n" + "="*80)
-        print("➡️ INICIANDO ETAPA: Geração da Descrição da PR")
+        print(f"➡️ INICIANDO ETAPA: Geração da Descrição da PR (Ambiente: {environment})")
         print("="*80 + "\n")
         
         print(f"Gerando descrição para PR #{pr_number} em {repo_full_name}")
+        print(f"API URL: {api_url}")
+        print(f"Modelo AI: {ai_model}")
         
         # Verificar se já existe uma descrição gerada por IA
         has_ai_description = "## Descrição Gerada por IA" in pr_body
@@ -66,10 +73,10 @@ def main():
             diff_text[:2000]  # Versão mais reduzida para descrição
         )
         
-        print("Chamando API da CI&T para gerar descrição...")
+        print("Chamando API de IA para gerar descrição...")
         
-        # Chamar a API da CI&T para análise
-        description = call_cit_ai_service(access_token, prompt)
+        # Chamar a API para análise
+        description = call_ai_service(api_url, access_token, prompt, ai_model)
         
         # Inicializar cliente GitHub
         g = Github(github_token)
@@ -108,9 +115,8 @@ def main():
         traceback.print_exc()
         exit(1)
 
-def call_cit_ai_service(access_token, prompt):
-    """Chamar a API de IA da CI&T com o prompt fornecido"""
-    url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
+def call_ai_service(api_url, access_token, prompt, model_name):
+    """Chamar a API de IA com o prompt fornecido"""
     
     payload = json.dumps({
         "stream": False,
@@ -121,7 +127,7 @@ def call_cit_ai_service(access_token, prompt):
             }
         ],
         "max_tokens": 1000,  # Menor para descrições
-        "model": "gpt-4o-mini"
+        "model": model_name
     })
     
     headers = {
@@ -134,7 +140,7 @@ def call_cit_ai_service(access_token, prompt):
     
     try:
         print("Enviando requisição para a API...")
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", api_url, headers=headers, data=payload)
         print(f"Status da resposta: {response.status_code}")
         
         response.raise_for_status()
@@ -156,4 +162,3 @@ def call_cit_ai_service(access_token, prompt):
 
 if __name__ == "__main__":
     main()
-    
