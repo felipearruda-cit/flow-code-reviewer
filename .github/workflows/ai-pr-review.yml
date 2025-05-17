@@ -1,4 +1,4 @@
-name: AI Pull Request Review
+name: Flow Pull Request Review
 
 on:
   pull_request:
