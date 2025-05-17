@@ -1,6 +1,5 @@
 import os
 import sys
-import glob
 import pickle
 import requests
 import pprint
@@ -22,52 +21,23 @@ def main():
     # Inicializar cliente GitHub
     g = Github(github_token)
     
-    # Lista de possíveis localizações para procurar o arquivo
-    possible_locations = [
-        "/home/runner/work/_temp/pr_info.pkl",  # Localização no GitHub Actions
-        os.path.join(os.getcwd(), "pr_info.pkl"),  # Diretório atual
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pr_info.pkl")  # Raiz do projeto
-    ]
-    
-    # Buscar o arquivo em todas as localizações possíveis
-    pr_info_file = None
-    for location in possible_locations:
-        if os.path.exists(location):
-            pr_info_file = location
-            print(f"Arquivo PR info encontrado em: {location}")
-            break
-    
-    if not pr_info_file:
-        print("❌ Arquivo de informações do PR não encontrado em nenhum local esperado!")
-        
-        # Como último recurso, tentar buscar qualquer arquivo pr_info.pkl no sistema
-        temp_dir = "/home/runner/work/_temp"
-        if os.path.exists(temp_dir):
-            for root, dirs, files in os.walk(temp_dir):
-                for file in files:
-                    if file == "pr_info.pkl":
-                        pr_info_file = os.path.join(root, file)
-                        print(f"Encontrado arquivo PR info em: {pr_info_file}")
-                        break
-                if pr_info_file:
-                    break
-        
-        if not pr_info_file:
-            sys.exit(1)
+    # Encontrar arquivo pr_info.pkl
+    pr_info_file = "/home/runner/work/_temp/pr_info.pkl"
+    if not os.path.exists(pr_info_file):
+        print("❌ Arquivo de informações do PR não encontrado!")
+        sys.exit(1)
     
     try:
         with open(pr_info_file, 'rb') as f:
             pr_data = pickle.load(f)
         
-        # Usar o formato correto que vimos nos logs
+        # Extrair dados necessários
         pr_number = pr_data.get('pr_number')
         repo_full_name = pr_data.get('repo_full_name')
+        pr_title = pr_data.get('pr_title', 'No title available')
         
-        # Verificar se conseguimos obter as informações básicas
         if pr_number is None or repo_full_name is None:
-            print("❌ Campos necessários não encontrados no arquivo:")
-            print(f"  - pr_number: {pr_number}")
-            print(f"  - repo_full_name: {repo_full_name}")
+            print("❌ Dados do PR incompletos!")
             sys.exit(1)
             
     except Exception as e:
@@ -76,55 +46,75 @@ def main():
     
     print(f"Realizando revisão de código para PR #{pr_number} em {repo_full_name}")
     
-    repo = g.get_repo(repo_full_name)
-    pull_request = repo.get_pull(pr_number)
-    
-    # Verificar se já existe um comentário de revisão anterior
-    existing_comment_id = None
-    review_comment_header = "## 🤖 Análise de Código"
-    
-    for comment in pull_request.get_issue_comments():
-        if review_comment_header in comment.body:
-            existing_comment_id = comment.id
-            break
-    
     print(f"================================================================================")
     print(f"➡️ INICIANDO ETAPA: Análise de Código")
     print(f"================================================================================")
     
-    # CORREÇÃO AQUI: Obter o diff do PR usando o método correto
-    # O PR não possui get_diff(), precisamos usar patch ou diff_url
+    # Obter o diff usando a API REST diretamente - contornar limitações de permissão
+    diff_text = ""
     try:
-        # Método 1: Obter o diff através do atributo patch
-        diff_text = pull_request.as_issue().get_comments()[0].patch
-    except (AttributeError, IndexError):
-        try:
-            # Método 2: Obter através do URL diff (método mais confiável)
-            import requests
-            headers = {"Authorization": f"token {github_token}"}
-            diff_response = requests.get(pull_request.diff_url, headers=headers)
-            diff_text = diff_response.text
-        except Exception as e:
-            print(f"Erro ao obter diff usando URL: {e}")
-            try:
-                # Método 3: Obter via API direta
-                diff_text = ""
-                files = pull_request.get_files()
-                for file in files:
-                    diff_text += f"File: {file.filename}\n"
-                    diff_text += f"Status: {file.status}\n"
-                    diff_text += f"Changes: +{file.additions} -{file.deletions}\n"
-                    if file.patch:
-                        diff_text += f"{file.patch}\n\n"
-            except Exception as e2:
-                print(f"Erro ao obter informações dos arquivos: {e2}")
-                diff_text = "Não foi possível obter o diff do PR."
+        # Usar a API REST diretamente para obter o diff
+        headers = {"Accept": "application/vnd.github.v3.diff", "Authorization": f"token {github_token}"}
+        diff_url = f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}"
+        
+        print(f"Obtendo diff da URL: {diff_url}")
+        response = requests.get(diff_url, headers=headers)
+        
+        if response.status_code == 200:
+            diff_text = response.text
+        else:
+            print(f"❌ Erro ao obter diff: {response.status_code} - {response.text}")
+            
+            # Tentar outro método: buscar arquivos alterados
+            files_url = f"{diff_url}/files"
+            print(f"Tentando obter arquivos modificados de: {files_url}")
+            
+            files_response = requests.get(files_url, headers={"Authorization": f"token {github_token}"})
+            
+            if files_response.status_code == 200:
+                files_data = files_response.json()
+                diff_text = "Arquivos modificados:\n\n"
+                
+                for file in files_data:
+                    diff_text += f"Arquivo: {file.get('filename')}\n"
+                    diff_text += f"Status: {file.get('status')}\n"
+                    diff_text += f"Alterações: +{file.get('additions', 0)} -{file.get('deletions', 0)}\n"
+                    
+                    # Obter patch se disponível
+                    if 'patch' in file:
+                        diff_text += f"\n{file['patch']}\n\n"
+            else:
+                print(f"❌ Erro ao obter arquivos modificados: {files_response.status_code} - {files_response.text}")
+                diff_text = "Não foi possível obter as alterações do PR."
+                
+    except Exception as e:
+        print(f"❌ Erro ao obter o diff do PR: {e}")
+        diff_text = "Erro ao obter alterações do PR."
     
-    # Resumir o diff para análise (limitar tamanho)
+    # Verificar se conseguimos obter algum conteúdo
+    if not diff_text or diff_text == "Não foi possível obter as alterações do PR." or diff_text == "Erro ao obter alterações do PR.":
+        print("❌ Não foi possível obter o diff do PR. Encerrando.")
+        sys.exit(1)
+    
+    # Resumir o diff para análise
     diff_summary = summarize_diff(diff_text)
     
-    # Preparar o prompt para a API da CI&T
-    pr_details = get_pr_details(pull_request)
+    # Preparar os detalhes do PR (simplificados, sem usar a API PyGithub diretamente)
+    pr_details = {
+        'title': pr_title,
+        'description': "No description available"
+    }
+    
+    # Tentar obter mais detalhes do PR via API REST
+    try:
+        pr_details_url = f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}"
+        pr_response = requests.get(pr_details_url, headers={"Authorization": f"token {github_token}"})
+        
+        if pr_response.status_code == 200:
+            pr_info = pr_response.json()
+            pr_details['description'] = pr_info.get('body') or "No description available"
+    except Exception as e:
+        print(f"Aviso: Não foi possível obter descrição detalhada do PR: {e}")
     
     print("Chamando API da CI&T para análise de código...")
     
@@ -153,33 +143,29 @@ def main():
             # Formatar o comentário de revisão
             review_comment = format_review_comment(review_content, "Análise de Código")
             
-            # Encontrar e atualizar comentário existente se houver
-            if existing_comment_id:
-                print(f"Encontrado comentário existente de análise de código (ID: {existing_comment_id})")
+            # Publicar comentário usando a API REST diretamente
+            try:
+                comment_url = f"https://api.github.com/repos/{repo_full_name}/issues/{pr_number}/comments"
+                comment_headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+                comment_data = {"body": review_comment}
                 
-                # Correção aqui
-                issue = repo.get_issue(pr_number)
-                comment = issue.get_comment(existing_comment_id)
+                comment_response = requests.post(comment_url, headers=comment_headers, json=comment_data)
                 
-                try:
-                    comment.edit(body=review_comment)
-                    print("Comentário de revisão de código atualizado com sucesso!")
-                except Exception as e:
-                    print(f"Erro ao atualizar comentário: {e}")
-            else:
-                # Criar um novo comentário no PR
-                try:
-                    pull_request.create_issue_comment(review_comment)
-                    print("Comentário de revisão de código criado com sucesso!")
-                except Exception as e:
-                    print(f"Erro ao criar comentário: {e}")
+                if comment_response.status_code in [201, 200]:
+                    print("✅ Comentário de revisão de código publicado com sucesso!")
+                else:
+                    print(f"❌ Erro ao publicar comentário: {comment_response.status_code} - {comment_response.text}")
+            except Exception as e:
+                print(f"❌ Erro ao publicar comentário: {e}")
         else:
-            print(f"❌ Erro na chamada da API: {response.text}")
+            print(f"❌ Erro na chamada da API: {response.status_code} - {response.text}")
             sys.exit(1)
     
     except Exception as e:
-        print(f"Erro ao realizar revisão de código: {e}")
+        print(f"❌ Erro ao realizar revisão de código: {e}")
         sys.exit(1)
+    
+    print("✅ Processo de revisão de código concluído!")
 
 if __name__ == "__main__":
     main()
