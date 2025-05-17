@@ -1,6 +1,6 @@
 import os
-import json
 import sys
+import pickle
 import requests
 from github import Github
 from utils import summarize_diff, format_review_comment, get_pr_details
@@ -20,11 +20,11 @@ def main():
     # Inicializar cliente GitHub
     g = Github(github_token)
     
-    # Obter detalhes do PR
-    pr_info_file = "pr_info.json"
+    # Obter detalhes do PR (mudança para arquivo pkl)
+    pr_info_file = "pr_info.pkl"  # Alterado para .pkl
     try:
-        with open(pr_info_file, 'r') as f:
-            pr_data = json.load(f)
+        with open(pr_info_file, 'rb') as f:  # 'rb' para modo binário
+            pr_data = pickle.load(f)  # Usar pickle.load em vez de json.load
     except Exception as e:
         print(f"❌ Erro ao carregar arquivo de informações do PR: {e}")
         sys.exit(1)
@@ -88,7 +88,7 @@ def main():
             if existing_comment_id:
                 print(f"Encontrado comentário existente de análise de código (ID: {existing_comment_id})")
                 
-                # Correção aqui - usar get_comment no objeto issue
+                # Correção aqui
                 issue = repo.get_issue(pr_number)
                 comment = issue.get_comment(existing_comment_id)
                 
