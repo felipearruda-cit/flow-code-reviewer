@@ -63,31 +63,19 @@ def main():
         print("Estrutura do arquivo pr_info.pkl:")
         pprint.pprint(pr_data)
         
-        # Adaptação para lidar com diferentes formatos de dados
-        # Verificar se as chaves necessárias existem, caso contrário, buscar alternativas
-        pr_number = None
-        repo_full_name = None
+        # Usar o formato correto que vimos nos logs:
+        # - 'pr_number' em vez de 'number'
+        # - 'repo_full_name' está correto
         
-        # Tentar obter o número do PR e nome do repo de diferentes maneiras
-        if isinstance(pr_data, dict):
-            # Método 1: Formato esperado originalmente
-            if 'number' in pr_data and 'repo_full_name' in pr_data:
-                pr_number = pr_data['number']
-                repo_full_name = pr_data['repo_full_name']
-                
-            # Método 2: Formato alternativo
-            elif 'pr_number' in pr_data:
-                pr_number = pr_data['pr_number']
-                repo_full_name = pr_data.get('repository_full_name') or pr_data.get('repo_name')
-                
-            # Método 3: Outra estrutura possível
-            elif 'pull_request' in pr_data and isinstance(pr_data['pull_request'], dict):
-                pr_number = pr_data['pull_request'].get('number')
-                repo_full_name = pr_data['pull_request'].get('base', {}).get('repo', {}).get('full_name')
+        # Extração dos dados com verificações de segurança
+        pr_number = pr_data.get('pr_number')
+        repo_full_name = pr_data.get('repo_full_name')
         
-        # Se não conseguimos extrair as informações necessárias, sair
+        # Verificar se conseguimos obter as informações básicas
         if pr_number is None or repo_full_name is None:
-            print("❌ Não foi possível encontrar o número do PR e o nome do repositório no arquivo.")
+            print("❌ Campos necessários não encontrados no arquivo:")
+            print(f"  - pr_number: {pr_number}")
+            print(f"  - repo_full_name: {repo_full_name}")
             sys.exit(1)
             
     except Exception as e:
