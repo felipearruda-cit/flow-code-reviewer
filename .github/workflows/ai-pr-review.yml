@@ -35,7 +35,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ENVIRONMENT_NAME: ${{ github.environment }}
         run: |
-          python .github/workflows/scripts/collect_pr_info.py
+          python src/collect_pr_info.py
           
       - name: 📝 Add PR Description
         id: add-description
@@ -47,7 +47,7 @@ jobs:
           AI_API_URL: ${{ vars.AI_API_URL || 'https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'gpt-4o-mini' }}
         run: |
-          python .github/workflows/scripts/add_pr_description.py
+          python src/add_pr_description.py
           
       - name: 🔍 Code Review Analysis
         id: code-review
@@ -59,4 +59,4 @@ jobs:
           AI_API_URL: ${{ vars.AI_API_URL || 'https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'gpt-4o-mini' }}
         run: |
-          python .github/workflows/scripts/code_review.py
+          python src/code_review.py
