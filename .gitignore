@@ -1,0 +1,71 @@
+# Ambientes virtuais
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Arquivos de variáveis de ambiente
+*.env
+.env.*
+
+# Compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de log e dumps
+*.log
+*.out
+*.pid
+
+# Arquivos temporários
+*.tmp
+*.swp
+*.bak
+*.orig
+
+# Testes
+.coverage
+.cache/
+.tox/
+.nox/
+
+# MyPy e outros linters
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# Pytest
+.pytest_cache/
+
+# Configurações do editor/IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Dados temporários
+*.sqlite3
+*.db
+*.csv
+*.tsv
+*.parquet
+
+# Docker
+**/docker-compose.override.yml
+.docker/
+
+# Outras pastas ignoráveis específicas
+logs/
+tmp/
