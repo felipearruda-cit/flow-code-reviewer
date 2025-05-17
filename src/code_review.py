@@ -58,16 +58,8 @@ def main():
     try:
         with open(pr_info_file, 'rb') as f:
             pr_data = pickle.load(f)
-            
-        # Debug - imprimir estrutura do arquivo para entender as chaves disponíveis
-        print("Estrutura do arquivo pr_info.pkl:")
-        pprint.pprint(pr_data)
         
-        # Usar o formato correto que vimos nos logs:
-        # - 'pr_number' em vez de 'number'
-        # - 'repo_full_name' está correto
-        
-        # Extração dos dados com verificações de segurança
+        # Usar o formato correto que vimos nos logs
         pr_number = pr_data.get('pr_number')
         repo_full_name = pr_data.get('repo_full_name')
         
@@ -100,8 +92,33 @@ def main():
     print(f"➡️ INICIANDO ETAPA: Análise de Código")
     print(f"================================================================================")
     
-    # Obter o diff do PR
-    diff_text = pull_request.get_diff()
+    # CORREÇÃO AQUI: Obter o diff do PR usando o método correto
+    # O PR não possui get_diff(), precisamos usar patch ou diff_url
+    try:
+        # Método 1: Obter o diff através do atributo patch
+        diff_text = pull_request.as_issue().get_comments()[0].patch
+    except (AttributeError, IndexError):
+        try:
+            # Método 2: Obter através do URL diff (método mais confiável)
+            import requests
+            headers = {"Authorization": f"token {github_token}"}
+            diff_response = requests.get(pull_request.diff_url, headers=headers)
+            diff_text = diff_response.text
+        except Exception as e:
+            print(f"Erro ao obter diff usando URL: {e}")
+            try:
+                # Método 3: Obter via API direta
+                diff_text = ""
+                files = pull_request.get_files()
+                for file in files:
+                    diff_text += f"File: {file.filename}\n"
+                    diff_text += f"Status: {file.status}\n"
+                    diff_text += f"Changes: +{file.additions} -{file.deletions}\n"
+                    if file.patch:
+                        diff_text += f"{file.patch}\n\n"
+            except Exception as e2:
+                print(f"Erro ao obter informações dos arquivos: {e2}")
+                diff_text = "Não foi possível obter o diff do PR."
     
     # Resumir o diff para análise (limitar tamanho)
     diff_summary = summarize_diff(diff_text)
