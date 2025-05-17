@@ -3,6 +3,7 @@ import sys
 import glob
 import pickle
 import requests
+import pprint
 from github import Github
 from utils import summarize_diff, format_review_comment, get_pr_details
 
@@ -57,14 +58,45 @@ def main():
     try:
         with open(pr_info_file, 'rb') as f:
             pr_data = pickle.load(f)
+            
+        # Debug - imprimir estrutura do arquivo para entender as chaves disponíveis
+        print("Estrutura do arquivo pr_info.pkl:")
+        pprint.pprint(pr_data)
+        
+        # Adaptação para lidar com diferentes formatos de dados
+        # Verificar se as chaves necessárias existem, caso contrário, buscar alternativas
+        pr_number = None
+        repo_full_name = None
+        
+        # Tentar obter o número do PR e nome do repo de diferentes maneiras
+        if isinstance(pr_data, dict):
+            # Método 1: Formato esperado originalmente
+            if 'number' in pr_data and 'repo_full_name' in pr_data:
+                pr_number = pr_data['number']
+                repo_full_name = pr_data['repo_full_name']
+                
+            # Método 2: Formato alternativo
+            elif 'pr_number' in pr_data:
+                pr_number = pr_data['pr_number']
+                repo_full_name = pr_data.get('repository_full_name') or pr_data.get('repo_name')
+                
+            # Método 3: Outra estrutura possível
+            elif 'pull_request' in pr_data and isinstance(pr_data['pull_request'], dict):
+                pr_number = pr_data['pull_request'].get('number')
+                repo_full_name = pr_data['pull_request'].get('base', {}).get('repo', {}).get('full_name')
+        
+        # Se não conseguimos extrair as informações necessárias, sair
+        if pr_number is None or repo_full_name is None:
+            print("❌ Não foi possível encontrar o número do PR e o nome do repositório no arquivo.")
+            sys.exit(1)
+            
     except Exception as e:
         print(f"❌ Erro ao carregar arquivo de informações do PR: {e}")
         sys.exit(1)
     
-    print(f"Realizando revisão de código para PR #{pr_data['number']} em {pr_data['repo_full_name']}")
+    print(f"Realizando revisão de código para PR #{pr_number} em {repo_full_name}")
     
-    repo = g.get_repo(pr_data['repo_full_name'])
-    pr_number = pr_data['number']
+    repo = g.get_repo(repo_full_name)
     pull_request = repo.get_pull(pr_number)
     
     # Verificar se já existe um comentário de revisão anterior
