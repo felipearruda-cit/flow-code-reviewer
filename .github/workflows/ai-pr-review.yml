@@ -1,7 +1,7 @@
 name: AI Pull Request Review
 
 on:
-  pull_request:
+  pull_request_target:      # use pull_request_target se precisar que secrets rodem em forks
     types: [opened, synchronize]
 
 permissions:
@@ -10,53 +10,54 @@ permissions:
 
 jobs:
   ai-review:
-    name: AI Code Review
     runs-on: ubuntu-latest
-    environment: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
+
+    # job-level env, disponível em todos os steps
+    env:
+      ENVIRONMENT: "${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}"
+
     steps:
-      - name: Checkout code
+      - name: Checkout PR
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          
+          ref: ${{ github.event.pull_request.head.sha }}
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests PyGithub python-dotenv
-      
+
       - name: 🔍 Collect PR Info
-        id: collect-info
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ENVIRONMENT: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
         run: |
+          echo "Running in ENVIRONMENT=$ENVIRONMENT"
           python src/collect_pr_info.py
-          
+
       - name: 📝 Add PR Description
-        id: add-description
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API: ${{ secrets.TOKEN_LLM_API }}
-          AI_API_URL: ${{ vars.AI_API_URL || 'https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions' }}
-          AI_MODEL: ${{ vars.AI_MODEL || 'gpt-4o-mini' }}
-          ENVIRONMENT: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
+          AI_API_URL: ${{ vars.AI_API_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
         run: |
+          echo "ENVIRONMENT=$ENVIRONMENT"
           python src/add_pr_description.py
-          
-      - name: 🔍 Code Review Analysis
-        id: code-review
+
+      - name: 🔎 Code Review Analysis
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API: ${{ secrets.TOKEN_LLM_API }}
-          AI_API_URL: ${{ vars.AI_API_URL || 'https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions' }}
-          AI_MODEL: ${{ vars.AI_MODEL || 'gpt-4o-mini' }}
-          ENVIRONMENT: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
+          AI_API_URL: ${{ vars.AI_API_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
         run: |
+          echo "ENVIRONMENT=$ENVIRONMENT"
           python src/code_review.py
