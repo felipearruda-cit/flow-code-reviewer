@@ -1,4 +1,4 @@
-# .github/workflows/scripts/code_review.py
+# src/code_review.py
 import os
 import pickle
 import requests
@@ -11,14 +11,18 @@ def main():
     # Obter variáveis de ambiente
     github_token = os.environ.get("GITHUB_TOKEN")
     access_token = os.environ.get("TOKEN_LLM_API")
-    environment = os.environ.get("ENVIRONMENT_NAME", "ai-pr-review")
     api_url = os.environ.get("AI_API_URL", "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions")
     ai_model = os.environ.get("AI_MODEL", "gpt-4o-mini")
+    environment = os.environ.get("ENVIRONMENT", "dev")  # dev por padrão
     
-    print(f"Ambiente em uso: {environment}")
+    # Log do ambiente atual
+    print(f"Utilizando configurações do ambiente: {environment}")
+    print(f"Environment GitHub: ai-pr-review-{environment}")
+    print(f"API URL: {api_url}")
+    print(f"Modelo AI: {ai_model}")
     
     if not access_token:
-        print(f"Erro: TOKEN_LLM_API não está definido no ambiente '{environment}'! Configure este secret.")
+        print(f"Erro: TOKEN_LLM_API não está definido! Configure este secret no ambiente 'ai-pr-review-{environment}'.")
         return
     
     try:
@@ -35,14 +39,15 @@ def main():
         pr_body = pr_info["pr_body"]
         file_list = pr_info["file_list"]
         diff_text = pr_info["diff_text"]
+        pr_base_ref = pr_info.get("pr_base_ref", "unknown")  # Branch de destino
+        saved_environment = pr_info.get("environment", environment)  # Usar environment salvo ou o atual
         
         print("\n" + "="*80)
-        print(f"➡️ INICIANDO ETAPA: Análise de Código (Ambiente: {environment})")
+        print(f"➡️ INICIANDO ETAPA: Análise de Código")
         print("="*80 + "\n")
         
         print(f"Realizando revisão de código para PR #{pr_number} em {repo_full_name}")
-        print(f"API URL: {api_url}")
-        print(f"Modelo AI: {ai_model}")
+        print(f"PR direcionada para branch: {pr_base_ref}")
         
         # Inicializar cliente GitHub
         g = Github(github_token)
@@ -65,6 +70,7 @@ def main():
         Por favor, analise esta solicitação de Pull Request e realize uma revisão de código detalhada:
         
         Título: {}
+        Branch de destino: {}
         Descrição: {}
         
         Arquivos alterados:
@@ -84,6 +90,7 @@ def main():
         quando possível e sugestões concretas para melhorias.
         """.format(
             pr_title,
+            pr_base_ref,
             pr_body[:500] if pr_body else "",
             file_list_text,
             diff_text[:4000]  # Versão completa para análise
@@ -92,7 +99,7 @@ def main():
         print("Chamando API de IA para análise de código...")
         
         # Chamar a API para análise
-        code_review = call_ai_service(api_url, access_token, prompt, ai_model)
+        code_review = call_ai_service(api_url, access_token, prompt, ai_model, saved_environment)
         
         # Preparar o comentário de revisão
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -115,7 +122,7 @@ def main():
             print(f"Comentário de revisão existente atualizado (ID: {existing_comment_id}).")
         else:
             # Se não existe, criar um novo comentário
-            review_comment += f"### Análise inicial ({current_date})\n\n" + code_review
+            review_comment += f"### Análise inicial ({current_date})\n\n" + code_review + f"\n\n<sub>Gerado com configurações do ambiente: {saved_environment}</sub>"
             pr.create_issue_comment(review_comment)
             print("Novo comentário de revisão de código postado com sucesso!")
         
@@ -129,7 +136,7 @@ def main():
         traceback.print_exc()
         exit(1)
 
-def call_ai_service(api_url, access_token, prompt, model_name):
+def call_ai_service(api_url, access_token, prompt, model_name, environment):
     """Chamar a API de IA com o prompt fornecido"""
     
     payload = json.dumps({
@@ -147,13 +154,14 @@ def call_ai_service(api_url, access_token, prompt, model_name):
     headers = {
         'FlowTenant': 'flowteam',
         'Content-Type': 'application/json',
-        'FlowAgent': 'code-reviewer',
+        'FlowAgent': f'code-reviewer-{environment}',
         'Accept': 'application/json',
         'Authorization': f'Bearer {access_token}'
     }
     
     try:
         print("Enviando requisição para a API...")
+        print(f"Usando FlowAgent: code-reviewer-{environment}")
         response = requests.request("POST", api_url, headers=headers, data=payload)
         print(f"Status da resposta: {response.status_code}")
         

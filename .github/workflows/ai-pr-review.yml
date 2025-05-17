@@ -12,7 +12,7 @@ jobs:
   ai-review:
     name: AI Code Review
     runs-on: ubuntu-latest
-    environment: ai-pr-review # Especifica o ambiente a ser usado
+    environment: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -33,7 +33,7 @@ jobs:
         id: collect-info
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ENVIRONMENT_NAME: ${{ github.environment }}
+          ENVIRONMENT: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
         run: |
           python src/collect_pr_info.py
           
@@ -43,9 +43,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API: ${{ secrets.TOKEN_LLM_API }}
-          ENVIRONMENT_NAME: ${{ github.environment }}
           AI_API_URL: ${{ vars.AI_API_URL || 'https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'gpt-4o-mini' }}
+          ENVIRONMENT: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
         run: |
           python src/add_pr_description.py
           
@@ -55,8 +55,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API: ${{ secrets.TOKEN_LLM_API }}
-          ENVIRONMENT_NAME: ${{ github.environment }}
           AI_API_URL: ${{ vars.AI_API_URL || 'https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions' }}
           AI_MODEL: ${{ vars.AI_MODEL || 'gpt-4o-mini' }}
+          ENVIRONMENT: ${{ github.base_ref == 'main' || github.base_ref == 'master' ? 'prod' : 'dev' }}
         run: |
           python src/code_review.py

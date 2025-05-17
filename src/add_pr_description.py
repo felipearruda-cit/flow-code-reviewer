@@ -1,4 +1,4 @@
-# .github/workflows/scripts/add_pr_description.py
+# src/add_pr_description.py
 import os
 import pickle
 import requests
@@ -10,14 +10,18 @@ def main():
     # Obter variáveis de ambiente
     github_token = os.environ.get("GITHUB_TOKEN")
     access_token = os.environ.get("TOKEN_LLM_API")
-    environment = os.environ.get("ENVIRONMENT_NAME", "ai-pr-review")
     api_url = os.environ.get("AI_API_URL", "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions")
     ai_model = os.environ.get("AI_MODEL", "gpt-4o-mini")
+    environment = os.environ.get("ENVIRONMENT", "dev")  # dev por padrão
     
-    print(f"Ambiente em uso: {environment}")
+    # Log do ambiente atual
+    print(f"Utilizando configurações do ambiente: {environment}")
+    print(f"Environment GitHub: ai-pr-review-{environment}")
+    print(f"API URL: {api_url}")
+    print(f"Modelo AI: {ai_model}")
     
     if not access_token:
-        print(f"Erro: TOKEN_LLM_API não está definido no ambiente '{environment}'! Configure este secret.")
+        print(f"Erro: TOKEN_LLM_API não está definido! Configure este secret no ambiente 'ai-pr-review-{environment}'.")
         return
     
     try:
@@ -34,14 +38,15 @@ def main():
         pr_body = pr_info["pr_body"] or ""
         file_list = pr_info["file_list"]
         diff_text = pr_info["diff_text"]
+        pr_base_ref = pr_info.get("pr_base_ref", "unknown")  # Branch de destino
+        saved_environment = pr_info.get("environment", environment)  # Usar environment salvo ou o atual
         
         print("\n" + "="*80)
-        print(f"➡️ INICIANDO ETAPA: Geração da Descrição da PR (Ambiente: {environment})")
+        print(f"➡️ INICIANDO ETAPA: Geração da Descrição da PR")
         print("="*80 + "\n")
         
         print(f"Gerando descrição para PR #{pr_number} em {repo_full_name}")
-        print(f"API URL: {api_url}")
-        print(f"Modelo AI: {ai_model}")
+        print(f"PR direcionada para branch: {pr_base_ref}")
         
         # Verificar se já existe uma descrição gerada por IA
         has_ai_description = "## Descrição Gerada por IA" in pr_body
@@ -54,6 +59,7 @@ def main():
         Por favor, analise esta solicitação de Pull Request e crie uma descrição concisa e informativa:
         
         Título: {}
+        Branch de destino: {}
         
         Arquivos alterados:
         {}
@@ -69,6 +75,7 @@ def main():
         Mantenha um tom profissional e foque nos aspectos técnicos mais relevantes.
         """.format(
             pr_title,
+            pr_base_ref,
             file_list_text,
             diff_text[:2000]  # Versão mais reduzida para descrição
         )
@@ -76,7 +83,7 @@ def main():
         print("Chamando API de IA para gerar descrição...")
         
         # Chamar a API para análise
-        description = call_ai_service(api_url, access_token, prompt, ai_model)
+        description = call_ai_service(api_url, access_token, prompt, ai_model, saved_environment)
         
         # Inicializar cliente GitHub
         g = Github(github_token)
@@ -101,6 +108,9 @@ def main():
             print("Adicionando descrição gerada por IA à descrição existente...")
             new_body = pr_body + f"\n\n## Descrição Gerada por IA\n\n{description}"
         
+        # Adicionar nota sobre o ambiente usado
+        new_body += f"\n\n<sub>Gerado com configurações do ambiente: {saved_environment}</sub>"
+        
         # Atualizar a PR
         pr.edit(body=new_body)
         print("Descrição da PR atualizada com sucesso!")
@@ -115,7 +125,7 @@ def main():
         traceback.print_exc()
         exit(1)
 
-def call_ai_service(api_url, access_token, prompt, model_name):
+def call_ai_service(api_url, access_token, prompt, model_name, environment):
     """Chamar a API de IA com o prompt fornecido"""
     
     payload = json.dumps({
@@ -133,13 +143,14 @@ def call_ai_service(api_url, access_token, prompt, model_name):
     headers = {
         'FlowTenant': 'flowteam',
         'Content-Type': 'application/json',
-        'FlowAgent': 'pr-description-generator',
+        'FlowAgent': f'pr-description-generator-{environment}',
         'Accept': 'application/json',
         'Authorization': f'Bearer {access_token}'
     }
     
     try:
         print("Enviando requisição para a API...")
+        print(f"Usando FlowAgent: pr-description-generator-{environment}")
         response = requests.request("POST", api_url, headers=headers, data=payload)
         print(f"Status da resposta: {response.status_code}")
         
