@@ -1,5 +1,6 @@
 import os
 import sys
+import glob
 import pickle
 import requests
 from github import Github
@@ -20,11 +21,42 @@ def main():
     # Inicializar cliente GitHub
     g = Github(github_token)
     
-    # Obter detalhes do PR (mudança para arquivo pkl)
-    pr_info_file = "pr_info.pkl"  # Alterado para .pkl
+    # Lista de possíveis localizações para procurar o arquivo
+    possible_locations = [
+        "/home/runner/work/_temp/pr_info.pkl",  # Localização no GitHub Actions
+        os.path.join(os.getcwd(), "pr_info.pkl"),  # Diretório atual
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pr_info.pkl")  # Raiz do projeto
+    ]
+    
+    # Buscar o arquivo em todas as localizações possíveis
+    pr_info_file = None
+    for location in possible_locations:
+        if os.path.exists(location):
+            pr_info_file = location
+            print(f"Arquivo PR info encontrado em: {location}")
+            break
+    
+    if not pr_info_file:
+        print("❌ Arquivo de informações do PR não encontrado em nenhum local esperado!")
+        
+        # Como último recurso, tentar buscar qualquer arquivo pr_info.pkl no sistema
+        temp_dir = "/home/runner/work/_temp"
+        if os.path.exists(temp_dir):
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file == "pr_info.pkl":
+                        pr_info_file = os.path.join(root, file)
+                        print(f"Encontrado arquivo PR info em: {pr_info_file}")
+                        break
+                if pr_info_file:
+                    break
+        
+        if not pr_info_file:
+            sys.exit(1)
+    
     try:
-        with open(pr_info_file, 'rb') as f:  # 'rb' para modo binário
-            pr_data = pickle.load(f)  # Usar pickle.load em vez de json.load
+        with open(pr_info_file, 'rb') as f:
+            pr_data = pickle.load(f)
     except Exception as e:
         print(f"❌ Erro ao carregar arquivo de informações do PR: {e}")
         sys.exit(1)
