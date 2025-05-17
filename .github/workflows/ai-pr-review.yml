@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   ai-review:
-    name: AI Code Review
+    name: Flow Code Reviewer
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
