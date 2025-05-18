@@ -60,7 +60,7 @@ def test_pr_info_collector_creates_pkl(prepare_env):
     collector.run()
 
     # Verifica se o arquivo foi criado
-    pkl_file = prepare_env / "pr_42.pkl1"
+    pkl_file = prepare_env / "pr_42.pkl"
     assert pkl_file.exists(), "O arquivo pr_42.pkl deve existir"
 
     # Carrega e valida conteúdo básico
