@@ -9,7 +9,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  ai-review:
+  flow-ai-reviewer:
     name: Flow Code Reviewer
     runs-on: ubuntu-latest
     steps:
