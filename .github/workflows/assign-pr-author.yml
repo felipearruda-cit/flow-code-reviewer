@@ -1,0 +1,19 @@
+name: Assign PR Author
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  assign-author:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign PR author
+        uses: actions-ecosystem/action-add-assignees@v1
+        with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            assignees:    ${{ github.actor }}
+
