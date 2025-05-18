@@ -1,6 +1,6 @@
 # 🇺🇸 Flow Code Reviewer
 
-[![PR Tests](https://github.com/felipearruda-cit/flow-code-reviewer/actions/workflows/pr-tests.yml/badge.svg?branch=main)](https://github.com/felipearruda-cit/flow-code-reviewer/actions/workflows/pr-tests.yml)
+[![PR Tests](https://github.com/felipearruda-cit/flow-code-reviewer/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/felipearruda-cit/flow-code-reviewer/actions/workflows/pr-tests.yml)
 
 This repository implements automation for **Pull Request description** generation and **code review**, using Flow via GitHub Actions.
 
