@@ -26,12 +26,12 @@ def main():
         
         repo_full_name = pr_info["repo_full_name"]
         pr_number      = pr_info["pr_number"]
-        pr_body        = pr_info["pr_body"] or ""
         pr_title       = pr_info["pr_title"]
+        pr_body        = pr_info["pr_body"] or ""
         file_list      = pr_info["file_list"]
         diff_text      = pr_info["diff_text"]
         
-        # --- formata prompt pedindo bullet‐points como no exemplo anexo ---
+        # --- formata prompt pedindo bullet‐points e tabela ---
         file_list_text = "\n".join(
             f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
             for f in file_list[:20]
@@ -39,26 +39,28 @@ def main():
         prompt = f"""
 Gere um *Flow Code Summary* para esta PR, no formato:
 
-1) Uma breve lista em bullets dos 3–5 pontos principais (como no exemplo anexo “Summary by CodeRabbit”);
+1) Uma breve lista em bullets dos 3–5 pontos principais;
 2) Em seguida, uma seção “Changes” com uma TABELA resumindo (arquivo e descrição curta da alteração);
-3) Mantenha um tom técnico e profissional.
 
 Dados:
 - Título: {pr_title}
-- Arquivos:  
+- Arquivos:
 {file_list_text}
-- Trecho das alterações:  
+
+- Trecho das alterações:
 {diff_text[:2000]}
 """
         
         summary = call_cit_ai_service(access_token, prompt)
+        
+        # --- limpa possíveis linhas "Summary by..." vindas da IA ---
+        summary = re.sub(r'(?m)^Summary by.*\n', '', summary).strip()
         
         # --- atualiza o corpo da PR, preservando descrição manual e NÃO duplicando summary ---
         g    = Github(github_token)
         repo = g.get_repo(repo_full_name)
         pr   = repo.get_pull(pr_number)
         
-        # regex que encontra a seção Flow Code Summary inteira (se existir)
         pattern = r"(## Flow Code Summary[\s\S]*?)(?=\n##|$)"
         
         if re.search(pattern, pr_body):
@@ -69,7 +71,6 @@ Dados:
             )
             print("✅ Flow Code Summary existente substituído.")
         else:
-            # se houver descrição manual, deixa ela e acrescenta logo abaixo
             if pr_body.strip() and pr_body not in ("No description provided.", ""):
                 new_body = pr_body + f"\n\n## Flow Code Summary\n\n{summary}\n\n"
                 print("✅ Flow Code Summary adicionado abaixo da descrição manual.")
