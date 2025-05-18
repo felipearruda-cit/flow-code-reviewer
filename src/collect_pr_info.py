@@ -1,4 +1,3 @@
-# .github/workflows/scripts/collect_pr_info.py
 import os
 import json
 import pickle
@@ -58,9 +57,10 @@ def main():
             "diff_text": diff_text
         }
         
-        # Salvar em arquivo temporário
+        # Nome do arquivo baseado no número da PR
+        pr_filename = f"pr_{pr_number}.pkl"
         temp_dir = os.environ.get('RUNNER_TEMP', '/tmp')
-        pr_info_path = os.path.join(temp_dir, 'pr_info.pkl')
+        pr_info_path = os.path.join(temp_dir, pr_filename)
         
         with open(pr_info_path, 'wb') as f:
             pickle.dump(pr_info, f)
@@ -69,8 +69,7 @@ def main():
         
     except Exception as e:
         print(f"Erro durante a coleta de informações: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
         exit(1)
 
 if __name__ == "__main__":
