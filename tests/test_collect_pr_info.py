@@ -1,56 +1,71 @@
 import os
 import json
 import pickle
-
 import pytest
-from src.collect_pr_info import main as collect_main
+from src.collect_pr_info import PRInfoCollector
 
+# Fixtures para simular o evento e o GitHub
 class DummyFile:
-    def __init__(self):
-        self.filename = "file1.txt"
-        self.additions = 10
-        self.deletions = 2
-        self.patch = "--- patch"
+    filename = "foo.py"
+    additions = 5
+    deletions = 1
+    patch = "patch foo"
 
-class DummyPull:
-    def __init__(self):
-        self.number = 1
-        self.title = "title"
-        self.body = None
+class DummyPR:
+    def __init__(self, files):
+        self._files = files
     def get_files(self):
-        return [DummyFile()]
+        return self._files
 
 class DummyRepo:
+    def __init__(self, pr):
+        self._pr = pr
     def get_pull(self, number):
-        return DummyPull()
+        return self._pr
 
 class DummyGithub:
-    def __init__(self, token): pass
-    def get_repo(self, name): return DummyRepo()
+    def __init__(self, token):
+        pass
+    def get_repo(self, full_name):
+        # Simula PR com um único arquivo
+        return DummyRepo(DummyPR([DummyFile()]))
 
 @pytest.fixture(autouse=True)
-def env_setup(monkeypatch, tmp_path, tmp_path_factory):
-    # Create dummy event.json
-    event = {"repository": {"full_name": "repo/name"},
-             "pull_request": {"number": 1, "title": "title", "body": "body"}}
-    event_file = tmp_path / "event.json"
-    event_file.write_text(json.dumps(event))
-    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+def prepare_env(tmp_path, monkeypatch):
+    # Cria um event.json simulado
+    evt = {
+        "repository": {"full_name": "user/repo"},
+        "pull_request": {"number": 42, "title": "My PR", "body": "Initial body"}
+    }
+    evt_path = tmp_path / "event.json"
+    evt_path.write_text(json.dumps(evt))
+
+    # Ajusta variáveis de ambiente
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(evt_path))
     monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
-    monkeypatch.setenv("GITHUB_TOKEN", "token")
-    # Patch Github class
-    import src.collect_pr_info as mod
-    monkeypatch.setattr(mod, "Github", DummyGithub)
+
+    # Injeta DummyGithub em vez do real
+    monkeypatch.setattr("src.collect_pr_info.Github", DummyGithub)
+
     return tmp_path
 
-def test_collect_pr_info_creates_pkl(env_setup):
-    temp = env_setup
-    # Run
-    collect_main()
-    # Assert file exists
-    pkl = temp / "pr_1.pkl"
-    assert pkl.exists(), "pr_1.pkl should be created"
-    data = pickle.loads(pkl.read_bytes())
-    assert data["repo_full_name"] == "repo/name"
-    assert data["pr_number"] == 1
+def test_pr_info_collector_creates_pkl(prepare_env):
+    temp_dir = str(prepare_env)
+    collector = PRInfoCollector(
+        github_token=os.environ["GITHUB_TOKEN"],
+        event_path=os.environ["GITHUB_EVENT_PATH"],
+        runner_temp=temp_dir
+    )
+    collector.run()
+
+    # Verifica se o arquivo foi criado
+    pkl_file = prepare_env / "pr_42.pkl"
+    assert pkl_file.exists(), "O arquivo pr_42.pkl deve existir"
+
+    # Carrega e valida conteúdo básico
+    data = pickle.loads(pkl_file.read_bytes())
+    assert data["repo_full_name"] == "user/repo"
+    assert data["pr_number"] == 42
     assert isinstance(data["file_list"], list)
+    assert data["file_list"][0]["filename"] == "foo.py"
