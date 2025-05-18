@@ -1,4 +1,3 @@
-# .github/workflows/scripts/code_review.py
 import os
 import pickle
 import requests
@@ -6,84 +5,98 @@ import json
 from github import Github
 from datetime import datetime
 
-def main():
-    github_token = os.environ.get("GITHUB_TOKEN")
-    access_token = os.environ.get("TOKEN_LLM_API")
-    lang = os.environ.get("FLOW_LANG", "en")
-    if not access_token:
-        print("Erro: TOKEN_LLM_API não definido."); return
+class CodeReviewer:
+    def __init__(self,
+                 github_token: str,
+                 llm_token:    str,
+                 runner_temp:  str,
+                 flow_lang:    str = "en"):
+        self.github_token = github_token
+        self.llm_token    = llm_token
+        self.runner_temp  = runner_temp
+        self.flow_lang    = flow_lang
 
-    # carrega pr_<n>.pkl
-    temp = os.environ.get("RUNNER_TEMP", "/tmp")
-    pkls = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
-    if not pkls:
-        print("Erro: pr_*.pkl não encontrado."); return
-    with open(os.path.join(temp, pkls[0]), "rb") as f:
-        pr = pickle.load(f)
+    def run(self):
+        # load PR info
+        files = [f for f in os.listdir(self.runner_temp) if f.startswith("pr_") and f.endswith(".pkl")]
+        if not files:
+            raise RuntimeError("Nenhum pr_*.pkl encontrado.")
+        with open(os.path.join(self.runner_temp, files[0]), "rb") as f:
+            pr = pickle.load(f)
 
-    # prepara lista de arquivos e diff
-    files_txt = "\n".join(
-        f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
-        for f in pr["file_list"][:20]
-    )
-    diff_txt = pr["diff_text"][:4000]
+        file_list_txt = "\n".join(
+            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
+            for f in pr["file_list"][:20]
+        )
+        diff_txt = pr["diff_text"][:4000]
 
-    # prompt genérico, sem pedir título da PR
-    prompt = f"""
+        prompt = f"""
 Generate a *Flow Code Reviewer* report for this Pull Request.
-Please reply in **{lang}** and include exactly these sections:
+Please reply in **{self.flow_lang}** with these sections:
 
 ## Resumo das Alterações
-- 3–5 bullet points com os principais highlights
+- 3–5 bullet points of the main highlights
 
 ## Changes
-- uma tabela markdown com (file | short description)
+| File | Description |
+|------|-------------|
+(…your table…)
 
 ## Suggestions
-- bullet points com potenciais bugs, code style, segurança e performance
+- bullet points on bugs, code style, security, performance
 
 Data:
 - Files:
-{files_txt}
+{file_list_txt}
 
 - Diff snippet:
 {diff_txt}
 """
-    review = call_ia(access_token, prompt)
+        review = self._call_llm(prompt)
 
-    # monta somente o comentário da revisão
-    comment_body = review.strip()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        comment = review.strip()
 
-    # publica/substitui no GitHub
-    gh   = Github(github_token)
-    pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+        gh   = Github(self.github_token)
+        pull= gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
 
-    existing = next((c for c in pull.get_issue_comments()
-                     if c.body.startswith("## Resumo das Alterações")), None)
-    if existing:
-        existing.edit(comment_body)
-        print("✅ Flow Code Reviewer atualizado.")
-    else:
-        pull.create_issue_comment(comment_body)
-        print("✅ Flow Code Reviewer criado.")
+        existing = next((c for c in pull.get_issue_comments()
+                         if c.body.lstrip().startswith("## Resumo das Alterações")), None)
+        if existing:
+            existing.edit(comment)
+            print("[code_review] ✅ existing comment updated")
+        else:
+            pull.create_issue_comment(comment)
+            print("[code_review] ✅ new comment created")
 
-def call_ia(token, prompt):
-    url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
-    payload = json.dumps({
-        "stream": False,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 3000,
-        "model": "gpt-4o-mini"
-    })
-    headers = {
-        'FlowTenant':'flowteam','FlowAgent':'code-reviewer',
-        'Content-Type':'application/json','Accept':'application/json',
-        'Authorization':f'Bearer {token}'
-    }
-    resp = requests.post(url, headers=headers, data=payload)
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    def _call_llm(self, prompt: str) -> str:
+        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
+        payload = json.dumps({
+            "stream": False,
+            "messages":[{"role":"user","content":prompt}],
+            "max_tokens":3000,
+            "model":"gpt-4o-mini"
+        })
+        headers = {
+            "FlowTenant":   "flowteam",
+            "FlowAgent":    "code-reviewer",
+            "Content-Type": "application/json",
+            "Accept":       "application/json",
+            "Authorization":f"Bearer {self.llm_token}"
+        }
+        resp = requests.post(url, headers=headers, data=payload)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
 
 if __name__ == "__main__":
-    main()
-
+    rev = CodeReviewer(
+        github_token=os.environ.get("GITHUB_TOKEN", ""),
+        llm_token=   os.environ.get("TOKEN_LLM_API", ""),
+        runner_temp=os.environ.get("RUNNER_TEMP", "/tmp"),
+        flow_lang=  os.environ.get("FLOW_LANG", "en")
+    )
+    try:
+        rev.run()
+    except Exception as e:
+        print(f"[code_review] ❌ {e}")
+        exit(1)
