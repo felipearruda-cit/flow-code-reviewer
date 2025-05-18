@@ -1,3 +1,4 @@
+# src/code_review.py
 import os
 import pickle
 import requests
@@ -18,49 +19,52 @@ class CodeReviewer:
 
     def run(self):
         # 1) Carrega o arquivo pr_<n>.pkl
-        files = [f for f in os.listdir(self.runner_temp) if f.startswith("pr_") and f.endswith(".pkl")]
+        temp = self.runner_temp
+        files = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
             raise RuntimeError("Nenhum pr_*.pkl encontrado em RUNNER_TEMP.")
-        with open(os.path.join(self.runner_temp, files[0]), "rb") as f:
+        with open(os.path.join(temp, files[0]), "rb") as f:
             pr = pickle.load(f)
 
         # 2) Prepara lista de arquivos e diff
-        file_list_txt = "\n".join(
+        files_txt = "\n".join(
             f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
             for f in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
-        # 3) Prompt solicitando sugestões com exemplos de código
+        # 3) Prompt com nova seção de Security & Best Practices
         prompt = f"""
 Generate a *Flow Code Reviewer* report for this Pull Request.
-Please reply in **{self.flow_lang}** and include exactly these sections:
+Please reply in **{self.flow_lang}**, and include exactly these sections:
 
 ## Resumo das Alterações
-- 3–5 bullet points with the main highlights
+- 3–5 bullet points com os principais highlights
 
 ## Changes
 | File | Description |
 |------|-------------|
-…(your table here)…
+(…your table here…)
 
 ## Suggestions
-- For each suggestion (bugs, code style, security, performance),
-  provide a brief code snippet or example illustrating the improvement.
+- Para cada item (bugs, code style, performance), forneça um breve snippet de código ilustrando a melhoria.
+
+## Security & Best Practices
+- Identifique potenciais vulnerabilidades de segurança ou riscos.
+- Apresente recomendações de melhores práticas (ex.: gestão de secrets, validações de entrada, tratamento de erros).
 
 Data:
 - Files:
-{file_list_txt}
+{files_txt}
 
 - Diff snippet:
 {diff_txt}
 """
-
         review = self._call_llm(prompt)
 
         # 4) Publica ou atualiza o comentário
-        gh   = Github(self.github_token)
-        pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+        gh    = Github(self.github_token)
+        pull  = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         comment_body = review.strip()
 
         existing = next((c for c in pull.get_issue_comments()
@@ -76,7 +80,7 @@ Data:
         url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
         payload = json.dumps({
             "stream": False,
-            "messages": [{"role":"user","content":prompt}],
+            "messages":[{"role":"user","content":prompt}],
             "max_tokens": 3000,
             "model": "gpt-4o-mini"
         })
