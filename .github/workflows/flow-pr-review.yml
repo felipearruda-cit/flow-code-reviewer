@@ -1,4 +1,3 @@
-# .github/workflows/flow-pr-review.yml
 name: Flow Pull Request Reviewer
 
 on:
@@ -10,8 +9,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  collect-info:
-    name: 🔍 Collect PR Info
+  flow-ai-reviewer:
+    name: Flow Code Reviewer
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,83 +25,24 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install PyGithub
+          python -m pip install --upgrade pip
+          pip install requests PyGithub python-dotenv
 
-      - name: Run PR Info Collector
+      - name: 🔍 Collect PR Info
         env:
-          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
-          RUNNER_TEMP:       ${{ github.workspace }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python src/collect_pr_info.py
 
-      - name: Upload PR Info artifact
-        uses: actions/upload-artifact@v1
-        with:
-          name: pr-info
-          path: ${{ github.workspace }}/pr_*.pkl
-
-  add-description:
-    name: 📝 Add PR Description
-    needs: collect-info
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Download PR Info artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: pr-info
-          path: ${{ github.workspace }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          pip install requests PyGithub python-dotenv
-
-      - name: Run PR Description Generator
+      - name: 📝 Add PR Description
         env:
-          GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API:  ${{ secrets.TOKEN_LLM_API }}
           FLOW_LANG:      ${{ secrets.FLOW_LANG }}
-          RUNNER_TEMP:    ${{ github.workspace }}
         run: python src/add_pr_description.py
 
-  code-review:
-    name: 🔍 Code Review Analysis
-    needs: collect-info
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Download PR Info artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: pr-info
-          path: ${{ github.workspace }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          pip install requests PyGithub python-dotenv
-
-      - name: Run Code Reviewer
+      - name: 🔍 Code Review Analysis
         env:
-          GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API:  ${{ secrets.TOKEN_LLM_API }}
           FLOW_LANG:      ${{ secrets.FLOW_LANG }}
-          RUNNER_TEMP:    ${{ github.workspace }}
         run: python src/code_review.py
