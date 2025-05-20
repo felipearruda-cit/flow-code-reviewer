@@ -36,7 +36,7 @@ class CodeReviewer:
         # 3) Prompt com nova seção de Security & Best Practices
         prompt = f"""
 Generate a *Flow Code Reviewer* report for this Pull Request.
-Please reply in **{self.flow_lang}**, and include exactly these sections:
+Please reply in **{self.flow_lang}**, and include exactly these sections and translate all the sections where you find ##:
 
 ## Resumo das Alterações
 - 3–5 bullet points com os principais highlights
