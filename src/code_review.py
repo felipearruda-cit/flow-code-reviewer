@@ -3,11 +3,10 @@ import os
 import pickle
 import requests
 import json
+import re
 from github import Github
 
 class CodeReviewer:
-    MARKER = "<!-- flow-code-reviewer -->"
-
     def __init__(self,
                  github_token: str,
                  llm_token:    str,
@@ -27,19 +26,18 @@ class CodeReviewer:
         with open(os.path.join(temp, files[0]), "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara arquivos e diff snippet
+        # 2) Prepara lista de arquivos e diff
         files_txt = "\n".join(
-            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
-            for f in pr["file_list"][:20]
+            f"- {file['filename']} (+{file['additions']}/-{file['deletions']})"
+            for file in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
-        # 3) Prompt pede à AI que gere cabeçalhos no idioma escolhido
+        # 3) Prompt instruindo a IA a NÃO criar título
         prompt = f"""
-Generate a *Flow Code Reviewer* for this Pull Request.
-Please reply in **{self.flow_lang}**.  
-Include whatever headings and structure you like (Summary, Changes, Suggestions, Security & Best Practices, etc.) — 
-no need for any English / Portuguese fallbacks; just use the chosen language.
+Generate a *Flow Code Reviewer* report for this Pull Request.
+Please reply in **{self.flow_lang}**.
+**Do not** include any top-level title or heading—just use sections like Summary, Changes, Suggestions, etc., in the chosen language.
 
 Data:
 - Files:
@@ -48,32 +46,38 @@ Data:
 - Diff snippet:
 {diff_txt}
 """
-        review = self._call_llm(prompt).strip()
 
-        # 4) Prepara o corpo do comentário, sempre prefixando com o marker
-        comment_body = f"{self.MARKER}\n\n{review}"
+        review = self._call_llm(prompt)
 
-        # 5) Publica ou atualiza no GitHub
+        # 4) Limpa qualquer título/heading que a IA tenha inserido
+        #    (remove linhas iniciais começando com #)
+        review = re.sub(r'(?m)^(#+\s*.+\n)+', '', review).strip()
+
+        # 5) Monta o comentário com o cabeçalho fixo
+        comment_body = f"## Flow Code Reviewer\n\n{review}"
+
+        # 6) Publica ou atualiza o comentário
         gh   = Github(self.github_token)
         pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
 
+        # Busca por comentário já existente (pelo prefixo fixo)
         existing = next((
             c for c in pull.get_issue_comments()
-            if c.body.startswith(self.MARKER)
+            if c.body.startswith("## Flow Code Reviewer")
         ), None)
 
         if existing:
             existing.edit(comment_body)
-            print("[code_review] ✅ comentário atualizado")
+            print("[code_review] ✅ comentário atualizado.")
         else:
             pull.create_issue_comment(comment_body)
-            print("[code_review] ✅ comentário criado")
+            print("[code_review] ✅ comentário criado.")
 
     def _call_llm(self, prompt: str) -> str:
         url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
         payload = json.dumps({
             "stream": False,
-            "messages":[{"role":"user","content":prompt}],
+            "messages": [{"role":"user","content":prompt}],
             "max_tokens": 3000,
             "model": "gpt-4o-mini"
         })
@@ -86,10 +90,10 @@ Data:
         }
         resp = requests.post(url, headers=headers, data=payload)
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        return resp.json()["choices"][0]["message"]["content"].strip()
+
 
 if __name__ == "__main__":
-    import sys
     reviewer = CodeReviewer(
         github_token=os.environ.get("GITHUB_TOKEN", ""),
         llm_token=   os.environ.get("TOKEN_LLM_API", ""),
@@ -100,4 +104,4 @@ if __name__ == "__main__":
         reviewer.run()
     except Exception as e:
         print(f"[code_review] ❌ {e}")
-        sys.exit(1)
+        exit(1)
