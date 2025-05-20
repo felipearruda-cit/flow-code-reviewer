@@ -36,7 +36,7 @@ class CodeReviewer:
 
         # 3) Prompt pede à AI que gere cabeçalhos no idioma escolhido
         prompt = f"""
-Generate a *Flow Code Reviewer* report for this Pull Request.
+Generate a *Flow Code Reviewer* for this Pull Request.
 Please reply in **{self.flow_lang}**.  
 Include whatever headings and structure you like (Summary, Changes, Suggestions, Security & Best Practices, etc.) — 
 no need for any English / Portuguese fallbacks; just use the chosen language.
