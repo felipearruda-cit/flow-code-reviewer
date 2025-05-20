@@ -67,5 +67,4 @@ O arquivo `.github/workflows/flow-pr-review.yml` dispara nos eventos `pull_reque
 3. Commit: `git commit -m "Descrição da sua mudança"`
 4. Push: `git push origin feature/nova-funcionalidade`
 5. Abra um Pull Request
-
 ---
