@@ -101,5 +101,4 @@ if __name__ == "__main__":
         rev.run()
     except Exception as e:
         print(f"[code_review] ❌ {e}")
-        exit(1)
-        
+        exit(1)        
