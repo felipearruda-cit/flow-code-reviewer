@@ -20,7 +20,7 @@ class PRDescriptionGenerator:
         # 1) Carrega o arquivo pr_<n>.pkl
         files = [f for f in os.listdir(self.runner_temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
-            raise RuntimeError("Nenhum pr_*.pkl encontrado em RUNNER_TEMP.")
+            raise RuntimeError("No pr_*.pkl found in RUNNER_TEMP.")
         pkl_path = os.path.join(self.runner_temp, files[0])
         with open(pkl_path, "rb") as f:
             pr = pickle.load(f)
@@ -68,7 +68,7 @@ Data:
         pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         pull.edit(body=new_body)
 
-        print("[add_pr_description] ✅ Flow Code Summary atualizado.")
+        print("[add_pr_description] ✅ Flow Code Summary updated.")
 
     def _call_llm(self, prompt: str) -> str:
         url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
