@@ -28,24 +28,26 @@ class CodeReviewer:
         with open(os.path.join(temp, pkls[0]), "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara lista de arquivos e diff snippet
+        # 2) Prepara arquivos e diff snippet
         files_txt = "\n".join(
             f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
             for f in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
-        # 3) Prompt reforçado para gerar TODO em {flow_lang}
+        # 3) Prompt pedindo 4 sessões, cabeçalhos traduzidos e conteúdo no idioma escolhido
         prompt = f"""
-Generate a *Flow Code Reviewer* report for this Pull Request.
-⚠️ Please reply **entirely** in **{self.flow_lang}** — translate all headings, bullets, tables and code comments into that language. 
-Do **not** leave any English.
+You are an AI assistant. Generate a *Flow Code Reviewer* report for this Pull Request,
+responding **entirely** in **{self.flow_lang}**.  
 
-Your report should include at least these sections, but feel free to adapt os títulos no idioma escolhido:
-1. Summary of Changes
-2. Changes (markdown table)
-3. Suggestions (with code snippets)
-4. Security & Best Practices
+**Your report must have exactly these four sections**, in this order:
+1. Changes
+2. Suggestions
+3. Security
+4. Best Practices
+
+**Translate each of these section headers** into the target language **{self.flow_lang}**, and under each header
+provide the content in that language. Do not output any other headings or titles.
 
 Data:
 - Files:
@@ -54,20 +56,18 @@ Data:
 - Diff snippet:
 {diff_txt}
 """
+        review = self._call_llm(prompt).strip()
 
-        review = self._call_llm(prompt)
+        # 4) Limpa títulos que a IA possa ter gerado por engano
+        review = re.sub(r'(?m)^(#+\s*.+\n)+', '', review).strip()
 
-        # 4) Remove qualquer título gerado pela IA para manter o cabeçalho fixo
-        #    (retira linhas iniciais começando com #)
-        clean = re.sub(r'(?m)^(#+\s*.+\n)+', '', review).strip()
-
-        # 5) Monta o comentário com cabeçalho estático
-        comment_body = f"{self.MARKER}\n\n## Flow Code Reviewer\n\n{clean}"
+        # 5) Monta o comentário com cabeçalho fixo + marker
+        comment_body = f"{self.MARKER}\n\n## Flow Code Reviewer\n\n{review}"
 
         # 6) Publica ou atualiza no GitHub
-        gh        = Github(self.github_token)
-        pull      = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
-        existing  = next((
+        gh       = Github(self.github_token)
+        pull     = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+        existing = next((
             c for c in pull.get_issue_comments()
             if c.body.startswith(self.MARKER)
         ), None)
@@ -88,15 +88,15 @@ Data:
             "model": "gpt-4o-mini"
         })
         headers = {
-            "FlowTenant":"flowteam",
-            "FlowAgent":"code-reviewer",
-            "Content-Type":"application/json",
-            "Accept":"application/json",
+            "FlowTenant":   "flowteam",
+            "FlowAgent":    "code-reviewer",
+            "Content-Type": "application/json",
+            "Accept":       "application/json",
             "Authorization":f"Bearer {self.llm_token}"
         }
         resp = requests.post(url, headers=headers, data=payload)
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
+        return resp.json()["choices"][0]["message"]["content"]
 
 if __name__ == "__main__":
     reviewer = CodeReviewer(
