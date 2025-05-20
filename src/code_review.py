@@ -7,6 +7,8 @@ import re
 from github import Github
 
 class CodeReviewer:
+    MARKER = "<!-- flow-code-reviewer -->"
+
     def __init__(self,
                  github_token: str,
                  llm_token:    str,
@@ -20,24 +22,30 @@ class CodeReviewer:
     def run(self):
         # 1) Carrega o pr_<n>.pkl
         temp = self.runner_temp
-        files = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
-        if not files:
+        pkls = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
+        if not pkls:
             raise RuntimeError("Nenhum pr_*.pkl encontrado em RUNNER_TEMP.")
-        with open(os.path.join(temp, files[0]), "rb") as f:
+        with open(os.path.join(temp, pkls[0]), "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara lista de arquivos e diff
+        # 2) Prepara lista de arquivos e diff snippet
         files_txt = "\n".join(
-            f"- {file['filename']} (+{file['additions']}/-{file['deletions']})"
-            for file in pr["file_list"][:20]
+            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
+            for f in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
-        # 3) Prompt instruindo a IA a NÃO criar título
+        # 3) Prompt reforçado para gerar TODO em {flow_lang}
         prompt = f"""
 Generate a *Flow Code Reviewer* report for this Pull Request.
-Please reply in **{self.flow_lang}**.
-**Do not** include any top-level title or heading—just use sections like Summary, Changes, Suggestions, etc., in the chosen language.
+⚠️ Please reply **entirely** in **{self.flow_lang}** — translate all headings, bullets, tables and code comments into that language. 
+Do **not** leave any English.
+
+Your report should include at least these sections, but feel free to adapt os títulos no idioma escolhido:
+1. Summary of Changes
+2. Changes (markdown table)
+3. Suggestions (with code snippets)
+4. Security & Best Practices
 
 Data:
 - Files:
@@ -49,21 +57,19 @@ Data:
 
         review = self._call_llm(prompt)
 
-        # 4) Limpa qualquer título/heading que a IA tenha inserido
-        #    (remove linhas iniciais começando com #)
-        review = re.sub(r'(?m)^(#+\s*.+\n)+', '', review).strip()
+        # 4) Remove qualquer título gerado pela IA para manter o cabeçalho fixo
+        #    (retira linhas iniciais começando com #)
+        clean = re.sub(r'(?m)^(#+\s*.+\n)+', '', review).strip()
 
-        # 5) Monta o comentário com o cabeçalho fixo
-        comment_body = f"## Flow Code Reviewer\n\n{review}"
+        # 5) Monta o comentário com cabeçalho estático
+        comment_body = f"{self.MARKER}\n\n## Flow Code Reviewer\n\n{clean}"
 
-        # 6) Publica ou atualiza o comentário
-        gh   = Github(self.github_token)
-        pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
-
-        # Busca por comentário já existente (pelo prefixo fixo)
-        existing = next((
+        # 6) Publica ou atualiza no GitHub
+        gh        = Github(self.github_token)
+        pull      = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+        existing  = next((
             c for c in pull.get_issue_comments()
-            if c.body.startswith("## Flow Code Reviewer")
+            if c.body.startswith(self.MARKER)
         ), None)
 
         if existing:
@@ -91,7 +97,6 @@ Data:
         resp = requests.post(url, headers=headers, data=payload)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()
-
 
 if __name__ == "__main__":
     reviewer = CodeReviewer(
