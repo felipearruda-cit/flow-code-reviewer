@@ -22,7 +22,7 @@ class CodeReviewer:
         temp = self.runner_temp
         files = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
-            raise RuntimeError("Nenhum pr_*.pkl encontrado em RUNNER_TEMP.")
+            raise RuntimeError("NO pr_*.pkl found in RUNNER_TEMP.")
         with open(os.path.join(temp, files[0]), "rb") as f:
             pr = pickle.load(f)
 
@@ -65,10 +65,10 @@ Data:
                          if c.body.lstrip().startswith("## Resumo das Alterações")), None)
         if existing:
             existing.edit(comment_body)
-            print("[code_review] ✅ Flow Code Reviewer atualizado.")
+            print("[code_review] ✅ Flow Code Reviewer updated.")
         else:
             pull.create_issue_comment(comment_body)
-            print("[code_review] ✅ Flow Code Reviewer criado.")
+            print("[code_review] ✅ Flow Code Reviewer created.")
 
     def _call_llm(self, prompt: str) -> str:
         url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"

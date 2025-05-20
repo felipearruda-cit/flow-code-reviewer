@@ -6,8 +6,8 @@ from github import Github
 class PRInfoCollector:
     def __init__(self, github_token: str, event_path: str, runner_temp: str):
         self.github_token = github_token
-        self.event_path = event_path
-        self.runner_temp = runner_temp
+        self.event_path   = event_path
+        self.runner_temp  = runner_temp
 
     def run(self):
         if not self.event_path:
@@ -35,6 +35,12 @@ class PRInfoCollector:
             })
             if file.patch:
                 diff_text += f"\n--- {file.filename}\n{file.patch}\n"
+
+        # === imprime somente a lista de arquivos que serão analisados ===
+        print("\n[collect_pr_info] 🗂️  Files to be analyzed:")
+        for f in files:
+            print(f"  • {f['filename']}")
+        print()
 
         pr_info = {
             "repo_full_name": repo_full_name,
