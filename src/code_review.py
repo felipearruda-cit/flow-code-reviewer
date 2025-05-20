@@ -20,7 +20,7 @@ class CodeReviewer:
         self.flow_lang    = flow_lang
 
     def run(self):
-        # 1) Carrega o pr_<n>.pkl
+        # 1) Carrega o arquivo pr_<n>.pkl
         temp = self.runner_temp
         pkls = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not pkls:
@@ -28,26 +28,22 @@ class CodeReviewer:
         with open(os.path.join(temp, pkls[0]), "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara arquivos e diff snippet
+        # 2) Prepara lista de arquivos e diff
         files_txt = "\n".join(
-            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
-            for f in pr["file_list"][:20]
+            f"- {x['filename']} (+{x['additions']}/-{x['deletions']})"
+            for x in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
-        # 3) Prompt pedindo 4 sessões, cabeçalhos traduzidos e conteúdo no idioma escolhido
+        # 3) Prompt que só varia por FLOW_LANG
         prompt = f"""
-You are an AI assistant. Generate a *Flow Code Reviewer* report for this Pull Request,
-responding **entirely** in **{self.flow_lang}**.  
-
-**Your report must have exactly these four sections**, in this order:
-1. Changes
-2. Suggestions
-3. Security
-4. Best Practices
-
-**Translate each of these section headers** into the target language **{self.flow_lang}**, and under each header
-provide the content in that language. Do not output any other headings or titles.
+Generate a *Flow Code Reviewer* report for this Pull Request.
+Please reply **entirely** in **{self.flow_lang}**, translating all headings and content.
+Your report must contain exactly these four sections (translated into the target language):
+1. Changes  — a markdown table (File | Description)
+2. Suggestions — bullet points with brief code examples
+3. Security — identify potential security risks
+4. Best Practices — actionable best-practice recommendations
 
 Data:
 - Files:
@@ -56,34 +52,35 @@ Data:
 - Diff snippet:
 {diff_txt}
 """
-        review = self._call_llm(prompt).strip()
+        review = self._call_llm(prompt)
 
-        # 4) Limpa títulos que a IA possa ter gerado por engano
-        review = re.sub(r'(?m)^(#+\s*.+\n)+', '', review).strip()
+        # 4) Limpa qualquer heading gerado pela IA
+        review = re.sub(r'(?m)^(#+\s*.+\n)+', "", review).strip()
 
-        # 5) Monta o comentário com cabeçalho fixo + marker
-        comment_body = f"{self.MARKER}\n\n## Flow Code Reviewer\n\n{review}"
+        # 5) Prepara o comentário com cabeçalho fixo
+        body = f"{self.MARKER}\n\n## Flow Code Reviewer\n\n{review}"
 
         # 6) Publica ou atualiza no GitHub
-        gh       = Github(self.github_token)
-        pull     = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+        gh   = Github(self.github_token)
+        pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+
         existing = next((
             c for c in pull.get_issue_comments()
             if c.body.startswith(self.MARKER)
         ), None)
 
         if existing:
-            existing.edit(comment_body)
+            existing.edit(body)
             print("[code_review] ✅ comentário atualizado.")
         else:
-            pull.create_issue_comment(comment_body)
+            pull.create_issue_comment(body)
             print("[code_review] ✅ comentário criado.")
 
     def _call_llm(self, prompt: str) -> str:
         url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
         payload = json.dumps({
             "stream": False,
-            "messages": [{"role":"user","content":prompt}],
+            "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 3000,
             "model": "gpt-4o-mini"
         })
@@ -92,21 +89,21 @@ Data:
             "FlowAgent":    "code-reviewer",
             "Content-Type": "application/json",
             "Accept":       "application/json",
-            "Authorization":f"Bearer {self.llm_token}"
+            "Authorization": f"Bearer {self.llm_token}"
         }
         resp = requests.post(url, headers=headers, data=payload)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
 
 if __name__ == "__main__":
-    reviewer = CodeReviewer(
+    rev = CodeReviewer(
         github_token=os.environ.get("GITHUB_TOKEN", ""),
         llm_token=   os.environ.get("TOKEN_LLM_API", ""),
         runner_temp=os.environ.get("RUNNER_TEMP", "/tmp"),
         flow_lang=   os.environ.get("FLOW_LANG", "en")
     )
     try:
-        reviewer.run()
+        rev.run()
     except Exception as e:
         print(f"[code_review] ❌ {e}")
         exit(1)
