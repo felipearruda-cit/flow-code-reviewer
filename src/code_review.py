@@ -45,7 +45,7 @@ Your report must contain exactly these five sections (translated into the target
 1. Changes  — a markdown table (File | Description)
 2. Suggestions — bullet points with brief code examples
 3. Security — identify potential security risks
-4. Best Practices — actionable best-practice recommendations
+4. Best Practices — actionable best-practice recommendations and code examples with the changes
 
 Data:
 - Files:
