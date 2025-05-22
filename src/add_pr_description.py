@@ -9,10 +9,12 @@ class PRDescriptionGenerator:
     def __init__(self,
                  github_token: str,
                  llm_token:    str,
+                 llm_api_url:  str,
                  runner_temp:  str,
                  flow_lang:    str = "en"):
         self.github_token = github_token
         self.llm_token    = llm_token
+        self.llm_api_url  = llm_api_url
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
@@ -71,21 +73,21 @@ Data:
         print("[add_pr_description] ✅ Flow Code Summary updated.")
 
     def _call_llm(self, prompt: str) -> str:
-        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
+        """Chama a API LLM usando a URL vinda do secret."""
         payload = json.dumps({
             "stream": False,
-            "messages": [{"role":"user","content":prompt}],
-            "max_tokens": 1000,
-            "model": "gpt-4o-mini"
+            "messages":[{"role":"user","content":prompt}],
+            "max_tokens":1000,
+            "model":"gpt-4o-mini"
         })
         headers = {
-            "FlowTenant":"flowteam",
-            "FlowAgent":"pr-summary-generator",
-            "Content-Type":"application/json",
-            "Accept":"application/json",
+            "FlowTenant":   "flowteam",
+            "FlowAgent":    "pr-summary-generator",
+            "Content-Type": "application/json",
+            "Accept":       "application/json",
             "Authorization":f"Bearer {self.llm_token}"
         }
-        resp = requests.post(url, headers=headers, data=payload)
+        resp = requests.post(self.llm_api_url, headers=headers, data=payload)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()
 
@@ -94,6 +96,7 @@ if __name__ == "__main__":
     gen = PRDescriptionGenerator(
         github_token=os.environ.get("GITHUB_TOKEN", ""),
         llm_token=   os.environ.get("TOKEN_LLM_API", ""),
+        llm_api_url= os.environ.get("LLM_API_URL", ""),
         runner_temp=os.environ.get("RUNNER_TEMP", "/tmp"),
         flow_lang=   os.environ.get("FLOW_LANG", "en")
     )

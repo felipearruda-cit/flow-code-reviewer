@@ -38,6 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API:  ${{ secrets.TOKEN_LLM_API }}
           FLOW_LANG:      ${{ secrets.FLOW_LANG }}
+          LLM_API_URL:   ${{ secrets.LLM_API_URL }}
         run: python src/add_pr_description.py
 
       - name: 🔍 Code Review Analysis
@@ -45,5 +46,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TOKEN_LLM_API:  ${{ secrets.TOKEN_LLM_API }}
           FLOW_LANG:      ${{ secrets.FLOW_LANG }}
+          LLM_API_URL:   ${{ secrets.LLM_API_URL }}
         run: python src/code_review.py
         
