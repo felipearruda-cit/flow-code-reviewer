@@ -73,17 +73,18 @@ Data:
         print("[add_pr_description] ✅ Flow Code Summary updated.")
 
     def _call_llm(self, prompt: str) -> str:
+        """Chama a API LLM usando a URL vinda do secret."""
         payload = json.dumps({
             "stream": False,
-            "messages": [{"role":"user","content":prompt}],
-            "max_tokens": 1000,
-            "model": "gpt-4o-mini"
+            "messages":[{"role":"user","content":prompt}],
+            "max_tokens":1000,
+            "model":"gpt-4o-mini"
         })
         headers = {
-            "FlowTenant":"flowteam",
-            "FlowAgent":"pr-summary-generator",
-            "Content-Type":"application/json",
-            "Accept":"application/json",
+            "FlowTenant":   "flowteam",
+            "FlowAgent":    "pr-summary-generator",
+            "Content-Type": "application/json",
+            "Accept":       "application/json",
             "Authorization":f"Bearer {self.llm_token}"
         }
         resp = requests.post(self.llm_api_url, headers=headers, data=payload)
