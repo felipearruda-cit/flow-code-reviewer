@@ -31,9 +31,9 @@ jobs:
 
       - name: 🔍 Collect PR Info
         env:
-          GITHUB_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_TEMP:     ${{ runner.temp }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          RUNNER_TEMP:        ${{ runner.temp }}
+          GITHUB_EVENT_PATH:  ${{ github.event_path }}
         run: python src/collect_pr_info.py
 
       - name: 📝 Add PR Description
@@ -43,9 +43,9 @@ jobs:
           AUTH_CLIENT_SECRET:   ${{ secrets.AUTH_CLIENT_SECRET }}
           AUTH_APP_TO_ACCESS:   ${{ secrets.AUTH_APP_TO_ACCESS }}
           AUTH_ENGINE_URL:      ${{ secrets.AUTH_ENGINE_URL }}
+          FLOW_TENANT:          ${{ secrets.FLOW_TENANT }}
           RUNNER_TEMP:          ${{ runner.temp }}
           FLOW_LANG:            ${{ secrets.FLOW_LANG }}
-          FLOW_TENANT:          ${{ secrets.FLOW_TENANT }}
         run: python src/add_pr_description.py
 
       - name: 🔍 Code Review Analysis
@@ -55,7 +55,7 @@ jobs:
           AUTH_CLIENT_SECRET:   ${{ secrets.AUTH_CLIENT_SECRET }}
           AUTH_APP_TO_ACCESS:   ${{ secrets.AUTH_APP_TO_ACCESS }}
           AUTH_ENGINE_URL:      ${{ secrets.AUTH_ENGINE_URL }}
+          FLOW_TENANT:          ${{ secrets.FLOW_TENANT }}
           RUNNER_TEMP:          ${{ runner.temp }}
           FLOW_LANG:            ${{ secrets.FLOW_LANG }}
-          FLOW_TENANT:          ${{ secrets.FLOW_TENANT }}
         run: python src/code_review.py
