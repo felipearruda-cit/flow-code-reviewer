@@ -26,6 +26,8 @@ class LLMTokenProvider:
         self.auth_url      = os.getenv("AUTH_ENGINE_URL", "")
         self.flow_tenant   = os.getenv("FLOW_TENANT", "")
 
+        print(self.auth_url)
+
         if not all([self.client_id, self.client_secret, self.app_to_access, self.auth_url, self.flow_tenant]):
             raise RuntimeError(
                 "Faltando variáveis de ambiente para autenticação: "
