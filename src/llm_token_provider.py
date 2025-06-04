@@ -1,3 +1,5 @@
+# llm_token_provider.py
+
 import os
 import requests
 
@@ -10,6 +12,7 @@ class LLMTokenProvider:
       - AUTH_CLIENT_SECRET
       - AUTH_APP_TO_ACCESS
       - AUTH_ENGINE_URL
+      - FLOW_TENANT
 
     Uso:
         provider = LLMTokenProvider()
@@ -21,16 +24,17 @@ class LLMTokenProvider:
         self.client_secret = os.getenv("AUTH_CLIENT_SECRET", "")
         self.app_to_access = os.getenv("AUTH_APP_TO_ACCESS", "")
         self.auth_url      = os.getenv("AUTH_ENGINE_URL", "")
+        self.flow_tenant   = os.getenv("FLOW_TENANT", "")
 
-        if not all([self.client_id, self.client_secret, self.app_to_access, self.auth_url]):
+        if not all([self.client_id, self.client_secret, self.app_to_access, self.auth_url, self.flow_tenant]):
             raise RuntimeError(
                 "Faltando variáveis de ambiente para autenticação: "
-                "AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, AUTH_APP_TO_ACCESS ou AUTH_ENGINE_URL."
+                "AUTH_CLIENT_ID, AUTH_CLIENT_SECRET, AUTH_APP_TO_ACCESS, AUTH_ENGINE_URL ou FLOW_TENANT."
             )
 
     def get_token(self) -> str:
         """
-        Faz a requisição ao serviço de autenticação e retorna o llm_token.
+        Faz a requisição ao serviço de autenticação e retorna o access_token.
         Raise RuntimeError em caso de falha.
         """
         payload = {
@@ -39,9 +43,9 @@ class LLMTokenProvider:
             "appToAccess":  self.app_to_access
         }
         headers = {
+            "FlowTenant":   self.flow_tenant,
             "Content-Type": "application/json",
-            "Accept":       "application/json",
-            "FlowTenant":   "flowteam"
+            "Accept":       "application/json"
         }
 
         resp = requests.post(self.auth_url, headers=headers, json=payload)
@@ -53,9 +57,8 @@ class LLMTokenProvider:
             )
 
         data = resp.json()
-        # Ajuste caso o campo do token retorne em outra chave
-        token = data.get("token") or data.get("accessToken") or data.get("data", {}).get("token")
-        if not token:
+        access_token = data.get("access_token")
+        if not access_token:
             raise RuntimeError(f"Resposta inesperada do auth-engine: {data}")
 
-        return token
+        return access_token
