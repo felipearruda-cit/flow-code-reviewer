@@ -40,7 +40,8 @@ class LLMTokenProvider:
         }
         headers = {
             "Content-Type": "application/json",
-            "Accept":       "application/json"
+            "Accept":       "application/json",
+            "FlowTenant":   "flowteam"
         }
 
         resp = requests.post(self.auth_url, headers=headers, json=payload)
