@@ -5,6 +5,7 @@ import requests
 import json
 from github import Github
 from datetime import datetime
+from llm_token_provider import LLMTokenProvider
 
 class CodeReviewer:
     def __init__(self,
@@ -13,11 +14,13 @@ class CodeReviewer:
                  llm_api_url:  str,
                  runner_temp:  str,
                  flow_lang:    str = "en"):
-        self.github_token = github_token
-        self.llm_token    = llm_token
+        self.github_token = github_token        
         self.llm_api_url  = llm_api_url
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
+
+        provider = LLMTokenProvider()
+        self.llm_token = provider.get_token()
 
     def run(self):
         # 1) Carrega o arquivo pr_<n>.pkl
