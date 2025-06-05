@@ -3,10 +3,8 @@
 import os
 import pickle
 import re
-import requests
-import json
 from github import Github
-from llm_token_provider import LLMTokenProvider
+from llm_client import LLMClient
 
 
 class PRDescriptionGenerator:
@@ -18,10 +16,11 @@ class PRDescriptionGenerator:
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
-        provider = LLMTokenProvider()
-        self.llm_token = provider.get_token()
+        # LLMClient instanciado com agent "pr-summary-generator"
+        self.llm_client = LLMClient(flow_agent="pr-summary-generator")
 
     def run(self):
+        # 1) Carrega o arquivo pr_<n>.pkl
         files = [f for f in os.listdir(self.runner_temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
             raise RuntimeError("No pr_*.pkl found in RUNNER_TEMP.")
@@ -29,12 +28,14 @@ class PRDescriptionGenerator:
         with open(pkl_path, "rb") as f:
             pr = pickle.load(f)
 
+        # 2) Prepara lista de arquivos e trecho do diff
         file_list_txt = "\n".join(
             f"- {finfo['filename']} (+{finfo['additions']}/-{finfo['deletions']})"
             for finfo in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:2000]
 
+        # 3) Prompt instruindo a IA **não** incluir nenhum cabeçalho próprio
         prompt = f"""
 Generate a *Flow Code Summary* for this Pull Request.
 Please reply in **{self.flow_lang}**, **without** adding any top-level heading or title
@@ -53,37 +54,24 @@ Data:
 {diff_txt}
 """
 
-        summary = self._call_llm(prompt)
+        summary = self.llm_client.chat(prompt, flow_lang=self.flow_lang, max_tokens=1000)
 
+        # 4) Remove qualquer bloco antigo de summary no corpo da PR
         body = pr["pr_body"] or ""
         body = re.sub(r"(?ms)^##\s*Flow Code Summary.*?(?=^##\s|\Z)", "", body).strip()
+
+        # 5) Remove eventuais headings duplicados vindos da IA
         summary = re.sub(r'(?m)^#+\s*Flow Code Summary.*\n', '', summary).strip()
+
+        # 6) Monta o novo corpo
         new_body = f"{body}\n\n## Flow Code Summary\n\n{summary}\n"
 
+        # 7) Edita a PR no GitHub
         gh   = Github(self.github_token)
         pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         pull.edit(body=new_body)
 
         print("[add_pr_description] ✅ Flow Code Summary updated.")
-
-    def _call_llm(self, prompt: str) -> str:
-        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
-        payload = json.dumps({
-            "stream": False,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1000,
-            "model": "gpt-4o-mini"
-        })
-        headers = {
-            "FlowTenant":   os.getenv("FLOW_TENANT", ""),
-            "FlowAgent":    "pr-summary-generator",
-            "Content-Type": "application/json",
-            "Accept":       "application/json",
-            "Authorization": f"Bearer {self.llm_token}"
-        }
-        resp = requests.post(url, headers=headers, data=payload)
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
 
 
 if __name__ == "__main__":

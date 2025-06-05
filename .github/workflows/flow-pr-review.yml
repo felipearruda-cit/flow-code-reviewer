@@ -36,7 +36,6 @@ jobs:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python src/collect_pr_info.py
 
-
       - name: 📝 Add PR Description
         env:
           GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
