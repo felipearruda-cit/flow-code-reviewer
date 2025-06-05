@@ -20,7 +20,6 @@ class LLMTokenProvider:
     """
 
     def __init__(self):
-        # Usa .strip() para remover espaços ou quebras de linha inesperadas
         self.client_id     = os.getenv("AUTH_CLIENT_ID", "").strip()
         self.client_secret = os.getenv("AUTH_CLIENT_SECRET", "").strip()
         self.app_to_access = os.getenv("AUTH_APP_TO_ACCESS", "").strip()
@@ -49,8 +48,6 @@ class LLMTokenProvider:
             "Accept":       "application/json"
         }
 
-        # Debug: imprima a URL exata antes de chamar, removendo eventuais espaços
-        # (Evite deixar esta linha em produção, para não vazar a URL nos logs após resolver.)
         print(f"[llm_token_provider] Chamando AUTH_ENGINE_URL = '{self.auth_url}'")
 
         resp = requests.post(self.auth_url, headers=headers, json=payload)
@@ -62,7 +59,6 @@ class LLMTokenProvider:
             )
 
         data = resp.json()
-        # O auth-engine retorna {'access_token': '***', 'expires_in': 3599}
         access_token = data.get("access_token") or data.get("accessToken") or data.get("token")
         if not access_token:
             raise RuntimeError(f"Resposta JSON inesperada do auth-engine: {data}")

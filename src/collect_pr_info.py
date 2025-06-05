@@ -39,7 +39,6 @@ class PRInfoCollector:
             if file.patch:
                 diff_text += f"\n--- {file.filename}\n{file.patch}\n"
 
-        # === imprime somente a lista de arquivos que serão analisados ===
         print("\n[collect_pr_info] 🗂️  Files to be analyzed:")
         for f in files:
             print(f"  • {f['filename']}")

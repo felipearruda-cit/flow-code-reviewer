@@ -2,10 +2,9 @@
 
 import os
 import pickle
+from github import Github
 import requests
 import json
-from github import Github
-import openai
 from llm_token_provider import LLMTokenProvider
 
 
@@ -19,14 +18,9 @@ class CodeReviewer:
         self.flow_lang    = flow_lang
 
         provider = LLMTokenProvider()
-        llm_token = provider.get_token()
-
-        # Configura OpenAI com o token recém obtido
-        openai.api_key = llm_token
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
+        self.llm_token = provider.get_token()
 
     def run(self):
-        # 1) Carrega o arquivo pr_<n>.pkl
         temp = self.runner_temp
         files = [f for f in os.listdir(temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
@@ -34,14 +28,12 @@ class CodeReviewer:
         with open(os.path.join(temp, files[0]), "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara lista de arquivos e diff
         files_txt = "\n".join(
             f"- {finfo['filename']} (+{finfo['additions']}/-{finfo['deletions']})"
             for finfo in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
-        # 3) Prompt com nova seção de Security & Best Practices
         prompt = f"""
 Generate a *Flow Code Reviewer* report for this Pull Request.
 
@@ -64,12 +56,10 @@ Data:
 """
         review = self._call_llm(prompt)
 
-        # 4) Publica ou atualiza o comentário
-        gh    = Github(self.github_token)
-        pull  = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
+        gh           = Github(self.github_token)
+        pull         = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         comment_body = review.strip()
 
-        # Procura comentário existente que comece com o header (ex: "## Flow Code Reviewer")
         existing = None
         for c in pull.get_issue_comments():
             if c.body.lstrip().startswith("## Flow Code Reviewer"):
@@ -84,16 +74,23 @@ Data:
             print("[code_review] ✅ Flow Code Reviewer created.")
 
     def _call_llm(self, prompt: str) -> str:
-        response = openai.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "Você é um especialista em revisão de código."},
-                {"role": "user",   "content": prompt}
-            ],
-            temperature=0.1,
-            max_tokens=3000
-        )
-        return response.choices[0].message.content.strip()
+        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
+        payload = json.dumps({
+            "stream": False,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 3000,
+            "model": "gpt-4o-mini"
+        })
+        headers = {
+            "FlowTenant":   os.getenv("FLOW_TENANT", ""),
+            "FlowAgent":    "code-reviewer",
+            "Content-Type": "application/json",
+            "Accept":       "application/json",
+            "Authorization": f"Bearer {self.llm_token}"
+        }
+        resp = requests.post(url, headers=headers, data=payload)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
 
 
 if __name__ == "__main__":

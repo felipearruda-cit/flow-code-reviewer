@@ -18,12 +18,10 @@ class PRDescriptionGenerator:
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
-        # Obtém llm_token via LLMTokenProvider
         provider = LLMTokenProvider()
         self.llm_token = provider.get_token()
 
     def run(self):
-        # 1) Carrega o arquivo pr_<n>.pkl
         files = [f for f in os.listdir(self.runner_temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
             raise RuntimeError("No pr_*.pkl found in RUNNER_TEMP.")
@@ -31,14 +29,12 @@ class PRDescriptionGenerator:
         with open(pkl_path, "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara lista de arquivos e trecho do diff
         file_list_txt = "\n".join(
             f"- {finfo['filename']} (+{finfo['additions']}/-{finfo['deletions']})"
             for finfo in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:2000]
 
-        # 3) Prompt instruindo a IA **não** incluir nenhum cabeçalho próprio
         prompt = f"""
 Generate a *Flow Code Summary* for this Pull Request.
 Please reply in **{self.flow_lang}**, **without** adding any top-level heading or title
@@ -59,17 +55,11 @@ Data:
 
         summary = self._call_llm(prompt)
 
-        # 4) Remove qualquer bloco antigo de summary no corpo da PR
         body = pr["pr_body"] or ""
         body = re.sub(r"(?ms)^##\s*Flow Code Summary.*?(?=^##\s|\Z)", "", body).strip()
-
-        # 5) Remove eventuais headings duplicados vindos da IA
         summary = re.sub(r'(?m)^#+\s*Flow Code Summary.*\n', '', summary).strip()
-
-        # 6) Monta o novo corpo
         new_body = f"{body}\n\n## Flow Code Summary\n\n{summary}\n"
 
-        # 7) Edita a PR no GitHub
         gh   = Github(self.github_token)
         pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         pull.edit(body=new_body)
@@ -85,10 +75,10 @@ Data:
             "model": "gpt-4o-mini"
         })
         headers = {
-            "FlowTenant":  os.getenv("FLOW_TENANT", ""),
-            "FlowAgent":   "pr-summary-generator",
+            "FlowTenant":   os.getenv("FLOW_TENANT", ""),
+            "FlowAgent":    "pr-summary-generator",
             "Content-Type": "application/json",
-            "Accept":      "application/json",
+            "Accept":       "application/json",
             "Authorization": f"Bearer {self.llm_token}"
         }
         resp = requests.post(url, headers=headers, data=payload)
