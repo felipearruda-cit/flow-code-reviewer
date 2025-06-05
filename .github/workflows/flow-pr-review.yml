@@ -29,6 +29,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests PyGithub python-dotenv openai
 
+      - name: ✏️ Update PR Title
+        env:
+          GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+          RUNNER_TEMP:          ${{ runner.temp }}
+          AUTH_CLIENT_ID:       ${{ secrets.AUTH_CLIENT_ID }}
+          AUTH_CLIENT_SECRET:   ${{ secrets.AUTH_CLIENT_SECRET }}
+          AUTH_APP_TO_ACCESS:   ${{ secrets.AUTH_APP_TO_ACCESS }}
+          AUTH_ENGINE_URL:      ${{ secrets.AUTH_ENGINE_URL }}
+          FLOW_TENANT:          ${{ secrets.FLOW_TENANT }}
+        run: python src/update_pr_title.py          
+
       - name: 🔍 Collect PR Info
         env:
           GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
