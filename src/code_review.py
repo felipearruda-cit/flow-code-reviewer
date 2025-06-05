@@ -1,30 +1,26 @@
 # src/code_review.py
-
 import os
 import pickle
 import requests
 import json
 from github import Github
-import openai
+from datetime import datetime
 from llm_token_provider import LLMTokenProvider
-
 
 class CodeReviewer:
     def __init__(self,
                  github_token: str,
+                 llm_token:    str,
+                 llm_api_url:  str,
                  runner_temp:  str,
                  flow_lang:    str = "en"):
-        self.github_token = github_token
+        self.github_token = github_token        
+        self.llm_api_url  = llm_api_url
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
-        # Obtém llm_token via LLMTokenProvider
         provider = LLMTokenProvider()
-        llm_token = provider.get_token()
-
-        # Configura OpenAI com o token recém obtido
-        openai.api_key = llm_token
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
+        self.llm_token = provider.get_token()
 
     def run(self):
         # 1) Carrega o arquivo pr_<n>.pkl
@@ -37,8 +33,8 @@ class CodeReviewer:
 
         # 2) Prepara lista de arquivos e diff
         files_txt = "\n".join(
-            f"- {finfo['filename']} (+{finfo['additions']}/-{finfo['deletions']})"
-            for finfo in pr["file_list"][:20]
+            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
+            for f in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:4000]
 
@@ -70,13 +66,8 @@ Data:
         pull  = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         comment_body = review.strip()
 
-        # Procura comentário existente que comece com o header (ex: "## Flow Code Reviewer")
-        existing = None
-        for c in pull.get_issue_comments():
-            if c.body.lstrip().startswith("## Flow Code Reviewer"):
-                existing = c
-                break
-
+        existing = next((c for c in pull.get_issue_comments()
+                         if c.body.lstrip().startswith("## Resumo das Alterações")), None)
         if existing:
             existing.edit(comment_body)
             print("[code_review] ✅ Flow Code Reviewer updated.")
@@ -85,26 +76,34 @@ Data:
             print("[code_review] ✅ Flow Code Reviewer created.")
 
     def _call_llm(self, prompt: str) -> str:
-        response = openai.ChatCompletion.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "Você é um especialista em revisão de código."},
-                {"role": "user",   "content": prompt}
-            ],
-            temperature=0.1,
-            max_tokens=3000
-        )
-        return response.choices[0].message.content.strip()
+        payload = json.dumps({
+            "stream": False,
+            "messages":[{"role":"user","content":prompt}],
+            "max_tokens": 3000,
+            "model": "gpt-4o-mini"
+        })
+        headers = {
+            "FlowTenant":"flowteam",
+            "FlowAgent":"code-reviewer",
+            "Content-Type":"application/json",
+            "Accept":"application/json",
+            "Authorization":f"Bearer {self.llm_token}"
+        }
+        resp = requests.post(self.llm_api_url, headers=headers, data=payload)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
 
 
 if __name__ == "__main__":
     rev = CodeReviewer(
         github_token=os.environ.get("GITHUB_TOKEN", ""),
+        llm_token=   os.environ.get("TOKEN_LLM_API", ""),
+        llm_api_url= os.environ.get("LLM_API_URL", ""),
         runner_temp=os.environ.get("RUNNER_TEMP", "/tmp"),
-        flow_lang=os.environ.get("FLOW_LANG", "en")
+        flow_lang=   os.environ.get("FLOW_LANG", "en")
     )
     try:
         rev.run()
     except Exception as e:
         print(f"[code_review] ❌ {e}")
-        exit(1)
+        exit(1)        
