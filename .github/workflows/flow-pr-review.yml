@@ -31,10 +31,16 @@ jobs:
 
       - name: 🔍 Collect PR Info
         env:
-          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_TEMP:        ${{ runner.temp }}
-          GITHUB_EVENT_PATH:  ${{ github.event_path }}
+          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          RUNNER_TEMP:       ${{ runner.temp }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python src/collect_pr_info.py
+
+      # Debug opcional para verificar se o secret está chegando
+      - name: Debug AUTH_ENGINE_URL
+        run: echo "AUTH_ENGINE_URL == '$AUTH_ENGINE_URL'"
+        env:
+          AUTH_ENGINE_URL: ${{ secrets.AUTH_ENGINE_URL }}
 
       - name: 📝 Add PR Description
         env:
