@@ -10,11 +10,16 @@ This repository implements automation for **Pull Request description** generatio
 
 ## Environment Variables / Secrets
 
-| Name            | Description                                                          | Default |
-| --------------- | -------------------------------------------------------------------- | ------- |
-| `GITHUB_TOKEN`  | Default GitHub Actions token for authenticating to the GitHub API.   | —       |
-| `TOKEN_LLM_API` | Access token for CI\&T's AI service.                                 | —       |
-| `FLOW_LANG`     | Language (ISO code or name) for the reports, e.g., `en`, `pt`, `zh`. | `en`    |
+| Name                  | Description                                                                                      | Default |
+| --------------------- | ------------------------------------------------------------------------------------------------ | ------- |
+| `GITHUB_TOKEN`        | Default GitHub Actions token for authenticating to the GitHub API.                               | —       |
+| `AUTH_CLIENT_ID`      | Client ID provided by the auth-engine service to obtain a temporary LLM API token.                | —       |
+| `AUTH_CLIENT_SECRET`  | Client Secret provided by the auth-engine service for authentication.                             | —       |
+| `AUTH_APP_TO_ACCESS`  | Identifier of the Flow app you want to access (as registered in the auth-engine).                | —       |
+| `AUTH_ENGINE_URL`     | Full URL of the auth-engine endpoint. | —       |
+| `FLOW_TENANT`         | Tenant name (e.g., `flowteam`) to be sent as `FlowTenant` header when requesting the LLM token. | —       |
+| `FLOW_LANG`           | Language (ISO code or name) for the reports, e.g., `en`, `pt`, `zh`.                              | `en`    |
+| `TOKEN_LLM_API`       | _(Legacy)_ Direct LLM token, only if you’re bypassing the auth-engine. Otherwise not needed.     | —       |
 
 > **Important:** Each run automatically clears old sections (`Flow Code Summary` and `Flow Code Reviewer Report`) before adding new content.
 
@@ -43,11 +48,18 @@ Este repositório implementa automação para geração de **descrição** e **r
 
 ## Variáveis de Ambiente / Secrets
 
-| Nome            | Descrição                                                             | Default |
-| --------------- | --------------------------------------------------------------------- | ------- |
-| `GITHUB_TOKEN`  | Token padrão do GitHub Actions para autenticação na API do GitHub.    | —       |
-| `TOKEN_LLM_API` | Token de acesso ao serviço de IA da CI\&T.                            | —       |
-| `FLOW_LANG`     | Idioma (código ISO ou nome) para os relatórios, ex: `en`, `pt`, `zh`. | `en`    |
+| Nome                 | Descrição                                                                                                       | Padrão |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
+| `GITHUB_TOKEN`       | Token padrão do GitHub Actions para autenticação na API do GitHub.                                              | —      |
+| `AUTH_CLIENT_ID`     | Client ID fornecido pelo serviço de autenticação para obter um token temporário da API de LLM.                  | —      |
+| `AUTH_CLIENT_SECRET` | Client Secret fornecido pelo serviço de autenticação para autenticar.                                           | —      |
+| `AUTH_APP_TO_ACCESS` | Identificador do app Flow que você quer acessar (registrado no serviço de autenticação).                         | —      |
+| `AUTH_ENGINE_URL`    | URL completa do endpoint de autenticação (ex.: `https://flow.ciandt.com/auth-engine-api/v1/api-key/token`).     | —      |
+| `FLOW_TENANT`        | Nome do tenant (ex.: `flowteam`) a ser enviado no cabeçalho `FlowTenant` ao solicitar o token LLM.              | —      |
+| `FLOW_LANG`          | Idioma (código ISO ou nome) para os relatórios, ex.: `en`, `pt`, `zh`.                                          | `en`   |
+| `TOKEN_LLM_API`      | _(Legado)_ Token de LLM direto, só se você estiver omitindo a etapa de autenticação. Caso contrário, não necessário. | —      |
+
+
 
 > **Importante:** Cada execução limpa automaticamente as seções antigas (`Flow Code Summary` e `Flow Code Reviewer Report`) antes de adicionar o novo conteúdo.
 
