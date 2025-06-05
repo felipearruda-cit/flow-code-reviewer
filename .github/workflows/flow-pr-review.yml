@@ -29,6 +29,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests PyGithub python-dotenv openai
 
+      - name: 🔍 Collect PR Info
+        env:
+          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          RUNNER_TEMP:       ${{ runner.temp }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: python src/collect_pr_info.py
+      
       - name: ✏️ Update PR Title
         env:
           GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
@@ -38,15 +45,7 @@ jobs:
           AUTH_APP_TO_ACCESS:   ${{ secrets.AUTH_APP_TO_ACCESS }}
           AUTH_ENGINE_URL:      ${{ secrets.AUTH_ENGINE_URL }}
           FLOW_TENANT:          ${{ secrets.FLOW_TENANT }}
-        run: python src/update_pr_title.py          
-
-      - name: 🔍 Collect PR Info
-        env:
-          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
-          RUNNER_TEMP:       ${{ runner.temp }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
-        run: python src/collect_pr_info.py
-
+        run: python src/update_pr_title.py  
 
       - name: 📝 Add PR Description
         env:
