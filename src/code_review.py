@@ -13,8 +13,8 @@ class CodeReviewer:
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
-        # LLMClient instanciado com agent "code-reviewer"
-        self.llm_client = LLMClient(flow_agent="code-reviewer")
+        # LLMClient instanciado com agent "pr-code-reviewer"
+        self.llm_client = LLMClient(flow_agent="pr-code-reviewer")
 
     def run(self):
         # 1) Carrega o arquivo pr_<n>.pkl
