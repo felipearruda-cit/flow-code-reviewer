@@ -1,5 +1,3 @@
-# src/collect_pr_info.py
-
 import os
 import json
 import pickle

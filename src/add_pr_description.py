@@ -1,5 +1,3 @@
-# src/add_pr_description.py
-
 import os
 import pickle
 import re
@@ -37,22 +35,22 @@ class PRDescriptionGenerator:
 
         # 3) Prompt instruindo a IA **não** incluir nenhum cabeçalho próprio
         prompt = f"""
-Generate a *Flow Code Summary* for this Pull Request.
-Please reply in **{self.flow_lang}**, **without** adding any top-level heading or title
-(such as "Resumo do Pull Request" or "Flow Code Summary"). We will
-prepend "## Flow Code Summary" ourselves.
+            Generate a *Flow Code Summary* for this Pull Request.
+            Please reply in **{self.flow_lang}**, **without** adding any top-level heading or title
+            (such as "Resumo do Pull Request" or "Flow Code Summary"). We will
+            prepend "## Flow Code Summary" ourselves.
 
-1) 3–5 bullet points with the main highlights;
-2) A **Changes** section as a markdown table (file | short description).
+            1) 3–5 bullet points with the main highlights;
+            2) A **Changes** section as a markdown table (file | short description).
 
-Data:
-- Title: {pr['pr_title']}
-- Files:
-{file_list_txt}
+            Data:
+            - Title: {pr['pr_title']}
+            - Files:
+            {file_list_txt}
 
-- Diff snippet:
-{diff_txt}
-"""
+            - Diff snippet:
+            {diff_txt}
+            """
 
         summary = self.llm_client.chat(prompt, flow_lang=self.flow_lang, max_tokens=1000)
 
