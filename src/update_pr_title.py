@@ -10,9 +10,9 @@ from llm_token_provider import LLMTokenProvider
 class UpdatePRTitle:
     """
     Classe responsável por:
-      1) Carregar informações da PR (via arquivo pr_<n>.pkl em RUNNER_TEMP)
-      2) Chamar o LLM (via LLMTokenProvider) para obter um título padronizado
-      3) Atualizar o título da PR no GitHub, se necessário
+    1) Carregar informações da PR (via arquivo pr_<n>.pkl em RUNNER_TEMP)
+    2) Chamar o LLM (via LLMTokenProvider) para obter um título padronizado
+    3) Atualizar o título da PR no GitHub, se necessário
     """
 
     def __init__(self,
@@ -66,11 +66,10 @@ class UpdatePRTitle:
 
     def _generate_standard_title(self, diff: str, current_title: str) -> str:
         """
-        Chama o LLM (via OpenAI) para sugerir um título padronizado
+        Chama o LLM via OpenAI client para sugerir um título padronizado
         baseado no diff e no título atual. Retorna a string do novo título.
         """
-        prompt = f"""
-You are a Pull Request title normalizer. Given the current PR title and a short diff excerpt,
+        prompt = f"""You are a Pull Request title normalizer. Given the current PR title and a short diff excerpt,
 propose a new, concise, well-formatted title following Conventional Commits style.
 
 Current title: "{current_title}"
@@ -82,7 +81,7 @@ Diff excerpt (truncated):
 Return ONLY the single new title, without any extra explanation.
 Respond in {self.flow_lang}.
 """
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "Assistant that suggests standardized PR titles."},
@@ -108,15 +107,15 @@ Respond in {self.flow_lang}.
 if __name__ == "__main__":
     """
     Espera as seguintes variáveis de ambiente:
-      - GITHUB_TOKEN
-      - RUNNER_TEMP
-      - FLOW_LANG (opcional, padrão 'en')
-      # As credenciais para LLMTokenProvider via auth-engine:
-      #   - AUTH_CLIENT_ID
-      #   - AUTH_CLIENT_SECRET
-      #   - AUTH_APP_TO_ACCESS
-      #   - AUTH_ENGINE_URL
-      #   - FLOW_TENANT
+    - GITHUB_TOKEN
+    - RUNNER_TEMP
+    - FLOW_LANG (opcional, padrão 'en')
+    # Credenciais para LLMTokenProvider via auth-engine:
+    #   - AUTH_CLIENT_ID
+    #   - AUTH_CLIENT_SECRET
+    #   - AUTH_APP_TO_ACCESS
+    #   - AUTH_ENGINE_URL
+    #   - FLOW_TENANT
     """
     github_token = os.getenv("GITHUB_TOKEN", "").strip()
     runner_temp = os.getenv("RUNNER_TEMP", "/tmp")
@@ -136,4 +135,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[update_pr_title] ❌ {e}")
         exit(1)
-        
