@@ -7,17 +7,15 @@ from github import Github
 from llm_token_provider import LLMTokenProvider
 
 class PRDescriptionGenerator:
-    def __init__(self,
+     def __init__(self,
                  github_token: str,
-                 llm_token:    str,
-                 llm_api_url:  str,
                  runner_temp:  str,
                  flow_lang:    str = "en"):
-        self.github_token = github_token        
-        self.llm_api_url  = llm_api_url
+        self.github_token = github_token
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
+        # Agora o provider faz o strip() e traz o token corretamente
         provider = LLMTokenProvider()
         self.llm_token = provider.get_token()
 

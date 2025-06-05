@@ -40,7 +40,7 @@ jobs:
       - name: Debug AUTH_ENGINE_URL
         run: echo "AUTH_ENGINE_URL == '$AUTH_ENGINE_URL'"
         env:
-          AUTH_ENGINE_URL: ${{ secrets.AUTH_ENGINE_URL }}
+          AUTH_ENGINE_URL: ${{ var.AUTH_ENGINE_URL }}
 
       - name: 📝 Add PR Description
         env:
