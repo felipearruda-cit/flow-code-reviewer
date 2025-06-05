@@ -1,5 +1,3 @@
-# src/code_review.py
-
 import os
 import pickle
 from github import Github
@@ -35,25 +33,25 @@ class CodeReviewer:
 
         # 3) Prompt com nova seção de Security & Best Practices
         prompt = f"""
-Generate a *Flow Code Reviewer* report for this Pull Request.
+            Generate a *Flow Code Reviewer* report for this Pull Request.
 
-Please reply **entirely** in **{self.flow_lang}**, and include exactly these sections:
+            Please reply **entirely** in **{self.flow_lang}**, and include exactly these sections:
 
-Your report must contain exactly these five sections (translated into the target language) and use markdown for sections:
+            Your report must contain exactly these five sections (translated into the target language) and use markdown for sections:
 
-0. Header - use the title *Flow Code Reviewer*
-1. Changes  — a markdown table (File | Description)
-2. Suggestions — bullet points with brief code examples
-3. Security — identify potential security risks
-4. Best Practices — actionable best-practice recommendations and code examples with the changes
+            0. Header - use the title *Flow Code Reviewer*
+            1. Changes  — a markdown table (File | Description)
+            2. Suggestions — bullet points with brief code examples
+            3. Security — identify potential security risks
+            4. Best Practices — actionable best-practice recommendations and code examples with the changes
 
-Data:
-- Files:
-{files_txt}
+            Data:
+            - Files:
+            {files_txt}
 
-- Diff snippet:
-{diff_txt}
-"""
+            - Diff snippet:
+            {diff_txt}
+            """
 
         review = self.llm_client.chat(prompt, flow_lang=self.flow_lang, max_tokens=3000)
 
