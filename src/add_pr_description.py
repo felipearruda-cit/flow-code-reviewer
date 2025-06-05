@@ -1,10 +1,13 @@
+# src/add_pr_description.py
+
 import os
 import pickle
+import re
 import requests
 import json
-import re
 from github import Github
 from llm_token_provider import LLMTokenProvider
+
 
 class PRDescriptionGenerator:
     def __init__(self,
@@ -15,10 +18,9 @@ class PRDescriptionGenerator:
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
-        # Agora o provider faz o strip() e traz o token corretamente
+        # Obtém llm_token via LLMTokenProvider
         provider = LLMTokenProvider()
         self.llm_token = provider.get_token()
-
 
     def run(self):
         # 1) Carrega o arquivo pr_<n>.pkl
@@ -31,8 +33,8 @@ class PRDescriptionGenerator:
 
         # 2) Prepara lista de arquivos e trecho do diff
         file_list_txt = "\n".join(
-            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
-            for f in pr["file_list"][:20]
+            f"- {finfo['filename']} (+{finfo['additions']}/-{finfo['deletions']})"
+            for finfo in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:2000]
 
@@ -75,21 +77,21 @@ Data:
         print("[add_pr_description] ✅ Flow Code Summary updated.")
 
     def _call_llm(self, prompt: str) -> str:
-        """Chama a API LLM usando a URL vinda do secret."""
+        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
         payload = json.dumps({
             "stream": False,
-            "messages":[{"role":"user","content":prompt}],
-            "max_tokens":1000,
-            "model":"gpt-4o-mini"
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1000,
+            "model": "gpt-4o-mini"
         })
         headers = {
-            "FlowTenant":   "flowteam",
-            "FlowAgent":    "pr-summary-generator",
+            "FlowTenant":  os.getenv("FLOW_TENANT", ""),
+            "FlowAgent":   "pr-summary-generator",
             "Content-Type": "application/json",
-            "Accept":       "application/json",
-            "Authorization":f"Bearer {self.llm_token}"
+            "Accept":      "application/json",
+            "Authorization": f"Bearer {self.llm_token}"
         }
-        resp = requests.post(self.llm_api_url, headers=headers, data=payload)
+        resp = requests.post(url, headers=headers, data=payload)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()
 
@@ -97,10 +99,8 @@ Data:
 if __name__ == "__main__":
     gen = PRDescriptionGenerator(
         github_token=os.environ.get("GITHUB_TOKEN", ""),
-        llm_token=   os.environ.get("TOKEN_LLM_API", ""),
-        llm_api_url= os.environ.get("LLM_API_URL", ""),
         runner_temp=os.environ.get("RUNNER_TEMP", "/tmp"),
-        flow_lang=   os.environ.get("FLOW_LANG", "en")
+        flow_lang=os.environ.get("FLOW_LANG", "en")
     )
     try:
         gen.run()

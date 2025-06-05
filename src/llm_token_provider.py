@@ -1,3 +1,5 @@
+# src/llm_token_provider.py
+
 import os
 import requests
 
@@ -36,7 +38,6 @@ class LLMTokenProvider:
         Faz a requisição ao serviço de autenticação e retorna o access_token.
         Em caso de status code >=400, lança RuntimeError com detalhe.
         """
-        # Monta o payload JSON
         payload = {
             "clientId":     self.client_id,
             "clientSecret": self.client_secret,
@@ -56,7 +57,6 @@ class LLMTokenProvider:
         try:
             resp.raise_for_status()
         except Exception:
-            # Se 403, informe o corpo completo para debug
             raise RuntimeError(
                 f"Erro ao obter llm_token: HTTP {resp.status_code} - {resp.text}"
             )

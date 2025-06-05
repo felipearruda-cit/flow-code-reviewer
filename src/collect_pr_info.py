@@ -1,7 +1,10 @@
+# src/collect_pr_info.py
+
 import os
 import json
 import pickle
 from github import Github
+
 
 class PRInfoCollector:
     def __init__(self, github_token: str, event_path: str, runner_temp: str):
@@ -57,6 +60,7 @@ class PRInfoCollector:
             pickle.dump(pr_info, f)
 
         print(f"[collect_pr_info] ✅ saved PR info to {out_path}")
+
 
 if __name__ == "__main__":
     collector = PRInfoCollector(
