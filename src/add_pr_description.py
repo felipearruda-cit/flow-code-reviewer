@@ -7,7 +7,7 @@ from github import Github
 from llm_token_provider import LLMTokenProvider
 
 class PRDescriptionGenerator:
-     def __init__(self,
+    def __init__(self,
                  github_token: str,
                  runner_temp:  str,
                  flow_lang:    str = "en"):
