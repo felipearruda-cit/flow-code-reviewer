@@ -3,6 +3,7 @@
 import os
 import pickle
 from github import Github
+import requests
 from llm_client import LLMClient
 
 
@@ -10,7 +11,7 @@ class UpdatePRTitle:
     """
     Classe responsável por:
       1) Carregar informações da PR (via arquivo pr_<n>.pkl em RUNNER_TEMP)
-      2) Chamar o LLM (via LLMClient) para obter um título padronizado
+      2) Chamar o LLM (via LLMClient) para obter um título padronizado em idioma específico
       3) Atualizar o título da PR no GitHub, se necessário
     """
 
@@ -64,9 +65,23 @@ class UpdatePRTitle:
     def _generate_standard_title(self, diff: str, current_title: str) -> str:
         """
         Chama o LLM via LLMClient para sugerir um título padronizado
-        baseado no diff e no título atual. Retorna a string do novo título.
+        baseado no diff e no título atual, no idioma flow_lang. Retorna a string do novo título.
         """
-        prompt = f"""You are a Pull Request title normalizer. Given the current PR title and a short diff excerpt,
+        # Decide o prompt baseado no idioma
+        if self.flow_lang.lower().startswith("pt"):
+            prompt = f"""Você é um normalizador de títulos de Pull Request. Dado o título atual e um trecho das alterações, 
+proponha um novo título conciso e bem formatado seguindo o estilo Conventional Commits.
+
+Título atual: \"{current_title}\"
+Trecho do diff (resumido):
+```
+{diff[:2000]}
+```
+
+Retorne SOMENTE o novo título em Português do Brasil, sem explicações adicionais.
+"""
+        else:
+            prompt = f"""You are a Pull Request title normalizer. Given the current PR title and a short diff excerpt, 
 propose a new, concise, well-formatted title following Conventional Commits style.
 
 Current title: \"{current_title}\"
@@ -78,6 +93,7 @@ Diff excerpt (truncated):
 Return ONLY the single new title, without any extra explanation.
 Respond in {self.flow_lang}.
 """
+
         # Chama LLMClient para obter o texto do título
         new_title = self.llm_client.chat(prompt, flow_lang=self.flow_lang, max_tokens=20)
         # Garante que pegamos apenas a primeira linha
@@ -100,12 +116,6 @@ if __name__ == "__main__":
       - GITHUB_TOKEN
       - RUNNER_TEMP
       - FLOW_LANG (opcional, padrão 'en')
-      # Credenciais para LLMTokenProvider via auth-engine:
-      #   - AUTH_CLIENT_ID
-      #   - AUTH_CLIENT_SECRET
-      #   - AUTH_APP_TO_ACCESS
-      #   - AUTH_ENGINE_URL
-      #   - FLOW_TENANT
     """
     github_token = os.getenv("GITHUB_TOKEN", "").strip()
     runner_temp = os.getenv("RUNNER_TEMP", "/tmp")
