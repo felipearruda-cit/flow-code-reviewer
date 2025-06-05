@@ -1,7 +1,10 @@
+# src/collect_pr_info.py
+
 import os
 import json
 import pickle
 from github import Github
+
 
 class PRInfoCollector:
     def __init__(self, github_token: str, event_path: str, runner_temp: str):
@@ -36,7 +39,6 @@ class PRInfoCollector:
             if file.patch:
                 diff_text += f"\n--- {file.filename}\n{file.patch}\n"
 
-        # === imprime somente a lista de arquivos que serão analisados ===
         print("\n[collect_pr_info] 🗂️  Files to be analyzed:")
         for f in files:
             print(f"  • {f['filename']}")
@@ -57,6 +59,7 @@ class PRInfoCollector:
             pickle.dump(pr_info, f)
 
         print(f"[collect_pr_info] ✅ saved PR info to {out_path}")
+
 
 if __name__ == "__main__":
     collector = PRInfoCollector(

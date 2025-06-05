@@ -1,25 +1,27 @@
+# src/add_pr_description.py
+
 import os
 import pickle
+import re
 import requests
 import json
-import re
 from github import Github
+from llm_token_provider import LLMTokenProvider
+
 
 class PRDescriptionGenerator:
     def __init__(self,
                  github_token: str,
-                 llm_token:    str,
-                 llm_api_url:  str,
                  runner_temp:  str,
                  flow_lang:    str = "en"):
         self.github_token = github_token
-        self.llm_token    = llm_token
-        self.llm_api_url  = llm_api_url
         self.runner_temp  = runner_temp
         self.flow_lang    = flow_lang
 
+        provider = LLMTokenProvider()
+        self.llm_token = provider.get_token()
+
     def run(self):
-        # 1) Carrega o arquivo pr_<n>.pkl
         files = [f for f in os.listdir(self.runner_temp) if f.startswith("pr_") and f.endswith(".pkl")]
         if not files:
             raise RuntimeError("No pr_*.pkl found in RUNNER_TEMP.")
@@ -27,14 +29,12 @@ class PRDescriptionGenerator:
         with open(pkl_path, "rb") as f:
             pr = pickle.load(f)
 
-        # 2) Prepara lista de arquivos e trecho do diff
         file_list_txt = "\n".join(
-            f"- {f['filename']} (+{f['additions']}/-{f['deletions']})"
-            for f in pr["file_list"][:20]
+            f"- {finfo['filename']} (+{finfo['additions']}/-{finfo['deletions']})"
+            for finfo in pr["file_list"][:20]
         )
         diff_txt = pr["diff_text"][:2000]
 
-        # 3) Prompt instruindo a IA **não** incluir nenhum cabeçalho próprio
         prompt = f"""
 Generate a *Flow Code Summary* for this Pull Request.
 Please reply in **{self.flow_lang}**, **without** adding any top-level heading or title
@@ -55,17 +55,11 @@ Data:
 
         summary = self._call_llm(prompt)
 
-        # 4) Remove qualquer bloco antigo de summary no corpo da PR
         body = pr["pr_body"] or ""
         body = re.sub(r"(?ms)^##\s*Flow Code Summary.*?(?=^##\s|\Z)", "", body).strip()
-
-        # 5) Remove eventuais headings duplicados vindos da IA
         summary = re.sub(r'(?m)^#+\s*Flow Code Summary.*\n', '', summary).strip()
-
-        # 6) Monta o novo corpo
         new_body = f"{body}\n\n## Flow Code Summary\n\n{summary}\n"
 
-        # 7) Edita a PR no GitHub
         gh   = Github(self.github_token)
         pull = gh.get_repo(pr["repo_full_name"]).get_pull(pr["pr_number"])
         pull.edit(body=new_body)
@@ -73,21 +67,21 @@ Data:
         print("[add_pr_description] ✅ Flow Code Summary updated.")
 
     def _call_llm(self, prompt: str) -> str:
-        """Chama a API LLM usando a URL vinda do secret."""
+        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
         payload = json.dumps({
             "stream": False,
-            "messages":[{"role":"user","content":prompt}],
-            "max_tokens":1000,
-            "model":"gpt-4o-mini"
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1000,
+            "model": "gpt-4o-mini"
         })
         headers = {
-            "FlowTenant":   "flowteam",
+            "FlowTenant":   os.getenv("FLOW_TENANT", ""),
             "FlowAgent":    "pr-summary-generator",
             "Content-Type": "application/json",
             "Accept":       "application/json",
-            "Authorization":f"Bearer {self.llm_token}"
+            "Authorization": f"Bearer {self.llm_token}"
         }
-        resp = requests.post(self.llm_api_url, headers=headers, data=payload)
+        resp = requests.post(url, headers=headers, data=payload)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"].strip()
 
@@ -95,10 +89,8 @@ Data:
 if __name__ == "__main__":
     gen = PRDescriptionGenerator(
         github_token=os.environ.get("GITHUB_TOKEN", ""),
-        llm_token=   os.environ.get("TOKEN_LLM_API", ""),
-        llm_api_url= os.environ.get("LLM_API_URL", ""),
         runner_temp=os.environ.get("RUNNER_TEMP", "/tmp"),
-        flow_lang=   os.environ.get("FLOW_LANG", "en")
+        flow_lang=os.environ.get("FLOW_LANG", "en")
     )
     try:
         gen.run()
