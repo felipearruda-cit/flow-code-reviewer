@@ -25,7 +25,7 @@ This repository implements automation for **Pull Request description** generatio
 
 ## GitHub Actions Workflow
 
-The file `.github/workflows/flow-pr-review.yml` triggers on `pull_request: [opened, synchronize]`. The **Flow Code Reviewer** job runs on every commit:
+The file `.github/workflows/flow-pr-review.yml` triggers on `pull_request: [opened, synchronize, reopened]`. The **Flow Code Reviewer** job runs on every commit:
 
 ## Customization
 
@@ -65,7 +65,7 @@ Este repositório implementa automação para geração de **descrição** e **r
 
 ## Workflow no GitHub Actions
 
-O arquivo `.github/workflows/flow-pr-review.yml` dispara nos eventos `pull_request: [opened, synchronize]`. O job **Flow Code Reviewer** executa em cada commit:
+O arquivo `.github/workflows/flow-pr-review.yml` dispara nos eventos `pull_request: [opened, synchronize, reopened]`. O job **Flow Code Reviewer** executa em cada commit:
 
 ## Personalização
 
