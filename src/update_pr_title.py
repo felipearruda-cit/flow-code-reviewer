@@ -136,3 +136,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[update_pr_title] ❌ {e}")
         exit(1)
+        
