@@ -2,17 +2,17 @@
 
 import os
 import pickle
+import requests
 from github import Github
-import openai
 from llm_token_provider import LLMTokenProvider
 
 
 class UpdatePRTitle:
     """
     Classe responsável por:
-    1) Carregar informações da PR (via arquivo pr_<n>.pkl em RUNNER_TEMP)
-    2) Chamar o LLM (via LLMTokenProvider) para obter um título padronizado
-    3) Atualizar o título da PR no GitHub, se necessário
+      1) Carregar informações da PR (via arquivo pr_<n>.pkl em RUNNER_TEMP)
+      2) Chamar o LLM (via LLMTokenProvider) para obter um título padronizado
+      3) Atualizar o título da PR no GitHub, se necessário
     """
 
     def __init__(self,
@@ -23,10 +23,9 @@ class UpdatePRTitle:
         self.runner_temp = runner_temp
         self.flow_lang = flow_lang
 
-        # Obtém llm_token via LLMTokenProvider e configura openai.api_key
+        # Obtém llm_token via LLMTokenProvider
         provider = LLMTokenProvider()
-        llm_token = provider.get_token()
-        openai.api_key = llm_token
+        self.llm_token = provider.get_token()
 
     def run(self):
         # 1) Carrega pr_<n>.pkl
@@ -66,13 +65,14 @@ class UpdatePRTitle:
 
     def _generate_standard_title(self, diff: str, current_title: str) -> str:
         """
-        Chama o LLM via OpenAI client para sugerir um título padronizado
+        Chama o LLM via Flow Orchestration API para sugerir um título padronizado
         baseado no diff e no título atual. Retorna a string do novo título.
         """
+        url = "https://flow.ciandt.com/ai-orchestration-api/v1/openai/chat/completions"
         prompt = f"""You are a Pull Request title normalizer. Given the current PR title and a short diff excerpt,
 propose a new, concise, well-formatted title following Conventional Commits style.
 
-Current title: "{current_title}"
+Current title: \"{current_title}\"
 Diff excerpt (truncated):
 ```
 {diff[:2000]}
@@ -81,16 +81,31 @@ Diff excerpt (truncated):
 Return ONLY the single new title, without any extra explanation.
 Respond in {self.flow_lang}.
 """
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
+        payload = {
+            "stream": False,
+            "messages": [
                 {"role": "system", "content": "Assistant that suggests standardized PR titles."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.0,
-            max_tokens=20
-        )
-        new_title = response.choices[0].message.content.strip().splitlines()[0]
+            "max_tokens": 20,
+            "model": "gpt-4o-mini"
+        }
+        headers = {
+            "FlowTenant":    os.getenv("FLOW_TENANT", ""),
+            "FlowAgent":     "pr-title-normalizer",
+            "Content-Type":  "application/json",
+            "Accept":        "application/json",
+            "Authorization": f"Bearer {self.llm_token}"
+        }
+
+        resp = requests.post(url, headers=headers, json=payload)
+        try:
+            resp.raise_for_status()
+        except Exception:
+            raise RuntimeError(f"Erro ao gerar título: HTTP {resp.status_code} - {resp.text}")
+
+        data = resp.json()
+        new_title = data["choices"][0]["message"]["content"].strip().splitlines()[0]
         return new_title
 
     def _update_github_pr_title(self, repo_full_name: str, pr_number: int, new_title: str):
@@ -107,15 +122,15 @@ Respond in {self.flow_lang}.
 if __name__ == "__main__":
     """
     Espera as seguintes variáveis de ambiente:
-    - GITHUB_TOKEN
-    - RUNNER_TEMP
-    - FLOW_LANG (opcional, padrão 'en')
-    # Credenciais para LLMTokenProvider via auth-engine:
-    #   - AUTH_CLIENT_ID
-    #   - AUTH_CLIENT_SECRET
-    #   - AUTH_APP_TO_ACCESS
-    #   - AUTH_ENGINE_URL
-    #   - FLOW_TENANT
+      - GITHUB_TOKEN
+      - RUNNER_TEMP
+      - FLOW_LANG (opcional, padrão 'en')
+      # Credenciais para LLMTokenProvider via auth-engine:
+      #   - AUTH_CLIENT_ID
+      #   - AUTH_CLIENT_SECRET
+      #   - AUTH_APP_TO_ACCESS
+      #   - AUTH_ENGINE_URL
+      #   - FLOW_TENANT
     """
     github_token = os.getenv("GITHUB_TOKEN", "").strip()
     runner_temp = os.getenv("RUNNER_TEMP", "/tmp")
